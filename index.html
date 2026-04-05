@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>開心農場</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🌾 開心農場</h1>
+      <div id="stats">
+        <span id="coins-display">🪙 <span id="coins">100</span> 金幣</span>
+        <span id="level-display">⭐ 等級 <span id="level">1</span></span>
+        <span id="exp-display">經驗 <span id="exp">0</span> / <span id="exp-next">100</span></span>
+      </div>
+    </header>
+
+    <main>
+      <section id="farm-section">
+        <h2>我的農場</h2>
+        <div id="farm-grid"></div>
+      </section>
+
+      <aside id="sidebar">
+        <section id="seed-shop">
+          <h2>種子商店</h2>
+          <div id="seed-list"></div>
+        </section>
+
+        <section id="tool-panel">
+          <h2>工具</h2>
+          <div id="tools">
+            <button class="tool-btn active" data-tool="plant" title="種植">🌱 種植</button>
+            <button class="tool-btn" data-tool="water" title="澆水">💧 澆水</button>
+            <button class="tool-btn" data-tool="harvest" title="收穫">🌾 收穫</button>
+            <button class="tool-btn" data-tool="remove" title="清除">🗑️ 清除</button>
+          </div>
+        </section>
+
+        <section id="inventory-panel">
+          <h2>倉庫</h2>
+          <div id="inventory"></div>
+          <button id="sell-all-btn">賣出全部 (獲得金幣)</button>
+        </section>
+
+        <section id="log-panel">
+          <h2>農場日誌</h2>
+          <ul id="log-list"></ul>
+        </section>
+      </aside>
+    </main>
+
+    <div id="modal-overlay" class="hidden">
+      <div id="modal">
+        <h3 id="modal-title"></h3>
+        <div id="modal-body"></div>
+        <button id="modal-close">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
