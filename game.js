@@ -352,10 +352,8 @@ function doWater(plot) {
   plot.watered = true;
   plot.wiltStartAt = null;
 
-  // Accelerate growth by waterBonus
   plot.readyAt = Math.max(t + 1000, plot.readyAt - crop.waterBonus * 1000);
 
-  // Restore wilting plant to growing state
   if (wasWilting) {
     plot.status = growProgress(plot) > 40 ? 'growing' : 'planted';
     addLog(`💧 澆水！${crop.name} 從枯萎中恢復，繼續生長`);
@@ -489,10 +487,8 @@ function growTick() {
 
     const crop = CROPS[plot.cropKey];
 
-    // Dead plants do nothing
     if (plot.status === 'dead') return;
 
-    // Wilting → dead check
     if (plot.status === 'wilting') {
       if (plot.wiltStartAt && t >= plot.wiltStartAt + crop.wiltGracePeriod * 1000) {
         plot.status = 'dead';
@@ -502,7 +498,6 @@ function growTick() {
       return;
     }
 
-    // Normal growth: check if ready
     if (t >= plot.readyAt) {
       plot.status = 'ready';
       addLog(`✅ ${crop.emoji} ${crop.name} 成熟了，快去收穫！`);
@@ -510,7 +505,6 @@ function growTick() {
       return;
     }
 
-    // Check if needs water → wilt
     if (plot.lastWateredAt && t >= plot.lastWateredAt + crop.waterInterval * 1000) {
       plot.status = 'wilting';
       plot.wiltStartAt = t;
@@ -519,7 +513,6 @@ function growTick() {
       return;
     }
 
-    // Update visual state
     const newStatus = plot.watered ? 'watered' : (growProgress(plot) > 40 ? 'growing' : 'planted');
     if (plot.status !== newStatus) { plot.status = newStatus; changed = true; }
   });
@@ -546,7 +539,6 @@ function init() {
     state.plots = defaultPlots();
   }
 
-  // Backfill new plot fields for saves from older version
   state.plots.forEach(plot => {
     if (plot.lastWateredAt === undefined) plot.lastWateredAt = null;
     if (plot.wiltStartAt === undefined)   plot.wiltStartAt = null;
