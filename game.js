@@ -328,6 +328,7 @@ function doPlant(plot) {
   plot.wiltStartAt = null;
   plot.fertilized = false;
   addLog(`🌱 種下了 ${crop.name}，記得每 ${crop.waterInterval} 秒澆水！`);
+  AudioManager.sfxPlant();
 }
 
 function doWater(plot) {
@@ -363,6 +364,7 @@ function doWater(plot) {
     plot.status = 'watered';
     addLog(`💧 澆水！${crop.name} 加速成長 ${crop.waterBonus} 秒`);
   }
+  AudioManager.sfxWater();
 }
 
 function doHarvest(plot) {
@@ -382,6 +384,7 @@ function doHarvest(plot) {
   state.inventory[plot.cropKey] = (state.inventory[plot.cropKey] || 0) + 1;
   gainExp(crop.expGain);
   addLog(`🌾 收穫了 ${crop.emoji} ${crop.name}！獲得 ${crop.expGain} 經驗`);
+  AudioManager.sfxHarvest();
   resetPlot(plot);
 }
 
@@ -395,6 +398,7 @@ function doRemove(plot) {
   } else {
     addLog('🗑️ 清除了枯死的植物');
   }
+  AudioManager.sfxRemove();
   resetPlot(plot);
 }
 
@@ -432,6 +436,7 @@ function doFertilize(plot) {
   plot.readyAt = Math.max(now() + 1000, plot.readyAt - Math.floor(remaining * 0.4));
   plot.fertilized = true;
   addLog(`⚗️ 施肥！${crop.name} 成熟時間縮短 40%，花費 🪙${cost}`);
+  AudioManager.sfxFertilize();
 }
 
 function resetPlot(plot) {
@@ -454,6 +459,7 @@ function gainExp(amount) {
     const bonus = state.level * 50;
     state.coins += bonus;
     addLog(`⭐ 升級！達到等級 ${state.level}，獲得 🪙${bonus} 金幣`);
+    AudioManager.sfxLevelUp();
     showModal(`🎉 升級了！`, `恭喜升到 ⭐ 等級 ${state.level}！\n解鎖了更多農地，並獲得 🪙${bonus} 金幣獎勵！`);
   }
 }
@@ -474,6 +480,7 @@ function sellAll() {
   }
   state.coins += total;
   addLog(`💰 賣出 ${sold.join('、')}，獲得 🪙${total}`);
+  AudioManager.sfxSell();
   saveState();
   render();
 }
@@ -497,6 +504,7 @@ function growTick() {
       if (plot.wiltStartAt && t >= plot.wiltStartAt + crop.wiltGracePeriod * 1000) {
         plot.status = 'dead';
         addLog(`💀 ${crop.emoji} ${crop.name} 枯死了！記得定時澆水`);
+        AudioManager.sfxDead();
         changed = true;
       }
       return;
@@ -515,6 +523,7 @@ function growTick() {
       plot.status = 'wilting';
       plot.wiltStartAt = t;
       addLog(`🥀 ${crop.emoji} ${crop.name} 開始枯萎，快去澆水！`);
+      AudioManager.sfxWilt();
       changed = true;
       return;
     }
@@ -565,6 +574,21 @@ function init() {
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.getElementById('modal-overlay').addEventListener('click', e => {
     if (e.target === document.getElementById('modal-overlay')) closeModal();
+  });
+
+  // Audio controls — start context on first interaction (browser autoplay policy)
+  document.body.addEventListener('click', () => AudioManager.start(), { once: true });
+
+  document.getElementById('bg-toggle').addEventListener('click', () => {
+    const on = AudioManager.toggleBg();
+    document.getElementById('bg-toggle').textContent = on ? '🎵' : '🔇';
+    document.getElementById('bg-toggle').classList.toggle('muted', !on);
+  });
+
+  document.getElementById('sfx-toggle').addEventListener('click', () => {
+    const on = AudioManager.toggleSfx();
+    document.getElementById('sfx-toggle').textContent = on ? '🔊' : '🔕';
+    document.getElementById('sfx-toggle').classList.toggle('muted', !on);
   });
 
   render();
