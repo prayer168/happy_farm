@@ -87,6 +87,17 @@ const GRID_SIZE = 6;
 const TOTAL_PLOTS = GRID_SIZE * GRID_SIZE;
 const PLOTS_UNLOCKED = [12, 18, 24, 30, 36, 36, 36, 36, 36];
 
+// ── Session isolation (each browser tab gets its own independent game) ────────
+function getSessionId() {
+  let id = sessionStorage.getItem('farmSessionId');
+  if (!id) {
+    id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    sessionStorage.setItem('farmSessionId', id);
+  }
+  return id;
+}
+const SAVE_KEY = 'happyFarm_' + getSessionId();
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let state = {
   coins: 100,
@@ -115,11 +126,11 @@ function defaultPlots() {
 
 // ── Save / Load ───────────────────────────────────────────────────────────────
 function saveState() {
-  localStorage.setItem('happyFarm', JSON.stringify(state));
+  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
 }
 
 function loadState() {
-  const raw = localStorage.getItem('happyFarm');
+  const raw = localStorage.getItem(SAVE_KEY);
   if (!raw) return;
   try {
     const saved = JSON.parse(raw);
@@ -537,14 +548,39 @@ function growTick() {
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
-function showModal(title, body) {
+function showModal(title, body, confirmCb) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').textContent = body;
+  const confirmBtn = document.getElementById('modal-confirm');
+  const closeBtn   = document.getElementById('modal-close');
+  if (confirmCb) {
+    confirmBtn.classList.remove('hidden');
+    confirmBtn.onclick = () => { closeModal(); confirmCb(); };
+    closeBtn.textContent = '取消';
+  } else {
+    confirmBtn.classList.add('hidden');
+    closeBtn.textContent = '關閉';
+  }
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
+}
+
+function resetGame() {
+  localStorage.removeItem(SAVE_KEY);
+  Object.assign(state, {
+    coins: 100, exp: 0, level: 1,
+    selectedSeed: 'radish', selectedTool: 'plant',
+    plots: defaultPlots(), log: [],
+  });
+  Object.keys(CROPS).forEach(k => { state.inventory[k] = 0; });
+  document.querySelectorAll('.tool-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.tool === 'plant')
+  );
+  render();
+  addLog('🌾 新遊戲開始！選種子開始你的農場之旅！');
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -574,6 +610,11 @@ function init() {
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.getElementById('modal-overlay').addEventListener('click', e => {
     if (e.target === document.getElementById('modal-overlay')) closeModal();
+  });
+
+  // Restart button
+  document.getElementById('restart-btn').addEventListener('click', () => {
+    showModal('🔄 重新開始', '確定要放棄目前所有進度，重新開始遊戲嗎？', resetGame);
   });
 
   // Audio controls — start context on first interaction (browser autoplay policy)

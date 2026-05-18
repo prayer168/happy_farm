@@ -54,6 +54,8 @@ header h1 { font-size: 1.6rem; letter-spacing: 2px; }
 }
 #audio-controls button:hover { background: rgba(255,255,255,.35); }
 #audio-controls button.muted { opacity: .4; }
+#restart-btn { background: rgba(255,80,50,.30) !important; }
+#restart-btn:hover { background: rgba(255,80,50,.55) !important; }
 
 #stats { display: flex; gap: 18px; font-size: .95rem; flex-wrap: wrap; }
 #stats span {
@@ -293,16 +295,18 @@ aside section {
 }
 #modal h3 { font-size: 1.2rem; margin-bottom: 12px; color: var(--green-dark); }
 #modal-body { font-size: .95rem; margin-bottom: 16px; line-height: 1.7; }
-#modal-close {
+#modal-actions { display: flex; gap: 10px; justify-content: center; }
+#modal-close, #modal-confirm {
   padding: 8px 24px;
-  background: var(--green-mid);
-  color: #fff;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   font-family: inherit;
   font-size: .95rem;
 }
+#modal-close    { background: var(--green-mid); color: #fff; }
+#modal-confirm  { background: #e53935; color: #fff; }
+#modal-confirm.hidden { display: none; }
 
 /* ── Responsive ── */
 @media (max-width: 700px) {

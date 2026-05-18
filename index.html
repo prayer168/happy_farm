@@ -13,6 +13,7 @@
       <div id="audio-controls">
         <button id="bg-toggle" title="背景音樂">🎵</button>
         <button id="sfx-toggle" title="音效">🔊</button>
+        <button id="restart-btn" title="重新開始遊戲">🔄 重玩</button>
       </div>
       <div id="stats">
         <span id="coins-display">🪙 <span id="coins">100</span> 金幣</span>
@@ -61,7 +62,10 @@
       <div id="modal">
         <h3 id="modal-title"></h3>
         <div id="modal-body"></div>
-        <button id="modal-close">關閉</button>
+        <div id="modal-actions">
+          <button id="modal-confirm" class="hidden">確認</button>
+          <button id="modal-close">關閉</button>
+        </div>
       </div>
     </div>
   </div>
