@@ -19,6 +19,7 @@
         <span id="weather-display">🌞 晴天</span>
       </div>
       <div id="header-btns">
+        <button id="player-btn" title="切換玩家">👤 ...</button>
         <button id="bg-toggle" title="背景音樂">🎵</button>
         <button id="sfx-toggle" title="音效">🔊</button>
         <button id="restart-btn" title="重新開始">🔄</button>
@@ -74,7 +75,11 @@
     <div id="modal">
       <h3 id="modal-title"></h3>
       <div id="modal-body"></div>
-      <button id="modal-close">關閉</button>
+      <input id="modal-input" type="text" class="hidden" maxlength="12" autocomplete="off">
+      <div id="modal-actions">
+        <button id="modal-confirm" class="hidden">確認</button>
+        <button id="modal-close">關閉</button>
+      </div>
     </div>
   </div>
 

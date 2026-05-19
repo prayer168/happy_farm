@@ -366,9 +366,37 @@ aside h2 {
   box-shadow: 0 8px 32px rgba(0,0,0,.3);
 }
 #modal h3 { font-size: 1.1rem; margin-bottom: 10px; color: var(--green-dark); }
-#modal-body { font-size: .9rem; margin-bottom: 14px; line-height: 1.7; white-space: pre-line; }
+#modal-body { font-size: .9rem; margin-bottom: 12px; line-height: 1.7; white-space: pre-line; }
+
+#modal-input {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  border: 2px solid var(--green-mid);
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: inherit;
+  outline: none;
+  text-align: center;
+}
+#modal-input:focus { border-color: var(--green-dark); }
+#modal-input.hidden { display: none; }
+
+#modal-actions { display: flex; gap: 8px; justify-content: center; }
+#modal-confirm {
+  padding: 7px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: .9rem;
+  background: var(--green-dark);
+  color: #fff;
+  font-weight: 700;
+}
+#modal-confirm.hidden { display: none; }
 #modal-close {
-  padding: 7px 24px;
+  padding: 7px 20px;
   border: none;
   border-radius: 6px;
   cursor: pointer;

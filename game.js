@@ -37,8 +37,14 @@ function defaultPlots() {
   return Array.from({length:TOTAL_PLOTS},(_,i)=>({id:i,status:'empty',cropKey:null,plantedAt:null,readyAt:null,watered:false,lastWateredAt:null,wiltStartAt:null,fertilized:false,fertCount:0,overWatered:false,deathCause:null}));
 }
 
-function saveState()  { localStorage.setItem('happyFarm', JSON.stringify(state)); }
-function loadState()  { try { const s=localStorage.getItem('happyFarm'); if(s) Object.assign(state,JSON.parse(s)); } catch(e){} }
+// ── Player management ────────────────────────────────────────────────────────
+const PLAYER_KEY = 'happyFarm_currentPlayer';
+function getPlayerName() { return localStorage.getItem(PLAYER_KEY) || ''; }
+function setPlayerName(n) { localStorage.setItem(PLAYER_KEY, n.trim()); }
+function getSaveKey()     { return 'happyFarm_save_' + (getPlayerName() || '_'); }
+
+function saveState()  { if (!getPlayerName()) return; localStorage.setItem(getSaveKey(), JSON.stringify(state)); }
+function loadState()  { try { const s=localStorage.getItem(getSaveKey()); if(s) Object.assign(state,JSON.parse(s)); } catch(e){} }
 function unlockedPlotCount() { return PLOTS_UNLOCKED[Math.min(state.level-1,PLOTS_UNLOCKED.length-1)]; }
 function expToNextLevel()    { return LEVEL_EXP[Math.min(state.level,LEVEL_EXP.length-1)]; }
 function addLog(msg) { state.log.unshift(msg); if(state.log.length>30) state.log.pop(); renderLog(); }
@@ -143,7 +149,14 @@ function renderWeather() {
   el.className = `weather-${state.weather}`;
 }
 
-function render() { renderStats(); renderSeedShop(); renderFarm(); renderInventory(); renderWeather(); }
+function renderPlayer() {
+  const btn = document.getElementById('player-btn');
+  if (!btn) return;
+  const name = getPlayerName();
+  btn.textContent = name ? `👤 ${name}` : '👤 ?';
+}
+
+function render() { renderStats(); renderSeedShop(); renderFarm(); renderInventory(); renderWeather(); renderPlayer(); }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 function selectSeed(key) { state.selectedSeed=key; renderSeedShop(); }
@@ -358,7 +371,7 @@ function growTick() {
 
 // ── Reset Game ────────────────────────────────────────────────────────────────
 function resetGame() {
-  localStorage.removeItem('happyFarm');
+  localStorage.removeItem(getSaveKey());
   Object.assign(state,{coins:100,exp:0,level:1,selectedSeed:'radish',selectedTool:'plant',plots:defaultPlots(),log:[],weather:'sunny',weatherNextAt:now()+60000,lastAutoWaterAt:0});
   Object.keys(CROPS).forEach(k=>{state.inventory[k]=0;});
   document.querySelectorAll('.tool-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.tool==='plant'));
@@ -367,12 +380,75 @@ function resetGame() {
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
-function showModal(title, body) {
+function showModal(title, body, opts = {}) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').textContent  = body;
+
+  const inp = document.getElementById('modal-input');
+  const confirmBtn = document.getElementById('modal-confirm');
+  const closeBtn   = document.getElementById('modal-close');
+
+  if (opts.input) {
+    inp.value = opts.inputValue || '';
+    inp.placeholder = opts.placeholder || '';
+    inp.classList.remove('hidden');
+    setTimeout(() => inp.focus(), 80);
+  } else {
+    inp.classList.add('hidden');
+  }
+
+  if (opts.onConfirm) {
+    confirmBtn.textContent = opts.confirmText || '確認';
+    confirmBtn.classList.remove('hidden');
+    confirmBtn.onclick = () => { closeModal(); opts.onConfirm(inp.value); };
+    inp.onkeydown = (e) => { if (e.key === 'Enter') { closeModal(); opts.onConfirm(inp.value); } };
+  } else {
+    confirmBtn.classList.add('hidden');
+  }
+
+  closeBtn.textContent = opts.closeText || '關閉';
+  closeBtn.style.display = opts.hideClose ? 'none' : '';
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
-function closeModal() { document.getElementById('modal-overlay').classList.add('hidden'); }
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+  document.getElementById('modal-input').classList.add('hidden');
+  document.getElementById('modal-confirm').classList.add('hidden');
+}
+
+// ── Player modal ──────────────────────────────────────────────────────────────
+function showPlayerModal(required = false) {
+  const current = getPlayerName();
+  const title = required ? '👋 歡迎來到開心農場！' : '🔄 切換玩家';
+  const body  = required
+    ? '請輸入你的名稱來儲存進度：'
+    : `目前玩家：${current}\n輸入名稱切換（或建立新玩家）：`;
+  showModal(title, body, {
+    input: true,
+    inputValue: required ? '' : '',
+    placeholder: '輸入名稱（最多12字）',
+    confirmText: '開始遊戲',
+    closeText: '取消',
+    hideClose: required,
+    onConfirm: (raw) => {
+      const name = raw.trim();
+      if (!name) { showPlayerModal(required); return; }
+      saveState();                   // save current player before switching
+      setPlayerName(name);
+      // reset state then load this player's save
+      Object.assign(state,{coins:100,exp:0,level:1,selectedSeed:'radish',selectedTool:'plant',
+        plots:defaultPlots(),log:[],weather:'sunny',weatherNextAt:now()+60000,lastAutoWaterAt:0});
+      Object.keys(CROPS).forEach(k=>{state.inventory[k]=0;});
+      state.plots.forEach(p=>{ p.fertCount=0; p.overWatered=false; p.deathCause=null; });
+      loadState();
+      document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool==='plant'));
+      selectTool(state.selectedTool || 'plant');
+      render();
+      addLog(`🌾 歡迎，${name}！繼續你的農場之旅！`);
+    },
+  });
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 function init() {
@@ -396,11 +472,14 @@ function init() {
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.getElementById('modal-overlay').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-overlay')) closeModal(); });
 
+  document.getElementById('player-btn').addEventListener('click', () => showPlayerModal(false));
+
   document.getElementById('restart-btn').addEventListener('click', () => {
-    showModal('🔄 重新開始', '確定放棄所有進度重新來過？（請再次點擊確認）');
-    let clicks=0;
-    const once = () => { clicks++; if(clicks>=1){ closeModal(); resetGame(); } document.getElementById('modal-close').removeEventListener('click', once); };
-    document.getElementById('modal-close').addEventListener('click', once);
+    showModal('🔄 重新開始', `確定要清除 ${getPlayerName()} 的所有進度重新開始嗎？`, {
+      confirmText: '確定重置',
+      closeText: '取消',
+      onConfirm: () => resetGame(),
+    });
   });
 
   const fsBtn = document.getElementById('fullscreen-btn');
@@ -430,7 +509,12 @@ function init() {
   render();
   setInterval(growTick, 1000);
   setInterval(saveState, 10000);
-  addLog('🌾 歡迎來到開心農場！選種子點農地種植，記得定時澆水！');
+
+  if (!getPlayerName()) {
+    showPlayerModal(true);   // 第一次進入：強制輸入名稱
+  } else {
+    addLog(`🌾 歡迎回來，${getPlayerName()}！繼續你的農場之旅！`);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
