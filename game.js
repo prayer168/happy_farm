@@ -156,7 +156,33 @@ function renderPlayer() {
   btn.textContent = name ? `👤 ${name}` : '👤 ?';
 }
 
-function render() { renderStats(); renderSeedShop(); renderFarm(); renderInventory(); renderWeather(); renderPlayer(); }
+function renderLeaderboard() {
+  const el = document.getElementById('leaderboard-list');
+  if (!el) return;
+  const players = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key.startsWith('happyFarm_save_')) continue;
+    try {
+      const d = JSON.parse(localStorage.getItem(key));
+      const lv = d.level || 1, coins = d.coins || 0;
+      players.push({ name: key.replace('happyFarm_save_', ''), level: lv, coins, score: lv * 10000 + coins });
+    } catch(e) {}
+  }
+  players.sort((a, b) => b.score - a.score);
+  const medals = ['🥇','🥈','🥉'];
+  const me = getPlayerName();
+  el.innerHTML = '';
+  if (!players.length) { el.innerHTML = '<li class="lb-empty">尚無記錄</li>'; return; }
+  players.slice(0, 10).forEach((p, i) => {
+    const li = document.createElement('li');
+    li.className = 'lb-item' + (p.name === me ? ' lb-me' : '');
+    li.innerHTML = `<span class="lb-rank">${medals[i] || (i+1)}</span><span class="lb-name">${p.name}</span><span class="lb-score">Lv${p.level} 🪙${p.coins.toLocaleString()}</span>`;
+    el.appendChild(li);
+  });
+}
+
+function render() { renderStats(); renderSeedShop(); renderFarm(); renderInventory(); renderWeather(); renderPlayer(); renderLeaderboard(); }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 function selectSeed(key) { state.selectedSeed=key; renderSeedShop(); }
@@ -290,7 +316,7 @@ function sellAll() {
   state.coins = Math.min(state.coins + total, MAX_VAL);
   addLog(`💰 賣出 ${sold.join('、')}，獲得 🪙${total}`);
   AudioManager.sfxSell();
-  saveState(); render();
+  saveState(); render(); renderLeaderboard();
 }
 
 // ── Weather Tick ──────────────────────────────────────────────────────────────
