@@ -12,7 +12,14 @@
   --shadow:      rgba(0,0,0,.15);
   --radius:      8px;
   --hdr:         50px;
+  --left-w:      155px;
+  --right-w:     205px;
+  --gap:         6px;
 }
+
+/* 平板縮小兩側 */
+@media (max-width: 1023px) { :root { --left-w: 130px; --right-w: 175px; } }
+@media (max-width: 800px)  { :root { --left-w: 110px; --right-w: 155px; --hdr: 46px; } }
 
 html, body {
   height: 100%;
@@ -22,14 +29,14 @@ html, body {
   background: linear-gradient(160deg, #caf0f8 0%, #90e0ef 40%, #b7e4c7 100%);
 }
 
-/* ── App: header / main ── */
+/* ── App grid (桌機 / 平板：無捲軸) ── */
 #app {
   display: grid;
   grid-template-rows: var(--hdr) 1fr;
   height: 100dvh;
   overflow: hidden;
   padding: 6px 8px;
-  gap: 5px;
+  gap: var(--gap);
 }
 
 /* ── Header ── */
@@ -37,27 +44,27 @@ header {
   background: var(--green-dark);
   color: var(--white);
   border-radius: var(--radius);
-  padding: 0 14px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   box-shadow: 0 2px 8px var(--shadow);
   overflow: hidden;
 }
 
-header h1 { font-size: 1.2rem; letter-spacing: 1px; white-space: nowrap; flex-shrink: 0; }
+header h1 { font-size: clamp(.95rem, 2vw, 1.25rem); letter-spacing: 1px; white-space: nowrap; flex-shrink: 0; }
 
 #stats {
   flex: 1;
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   overflow: hidden;
-  font-size: .82rem;
+  font-size: clamp(.7rem, 1.2vw, .85rem);
 }
 #stats span {
   background: rgba(255,255,255,.15);
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 20px;
   white-space: nowrap;
 }
@@ -68,11 +75,12 @@ header h1 { font-size: 1.2rem; letter-spacing: 1px; white-space: nowrap; flex-sh
   border: 1px solid rgba(255,255,255,.35);
   color: #fff;
   border-radius: 6px;
-  padding: 3px 8px;
+  padding: 3px 7px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: clamp(.85rem, 1.5vw, 1rem);
   line-height: 1.4;
   transition: background .15s;
+  white-space: nowrap;
 }
 #header-btns button:hover { background: rgba(255,255,255,.35); }
 #header-btns button.muted { opacity: .4; }
@@ -82,8 +90,8 @@ header h1 { font-size: 1.2rem; letter-spacing: 1px; white-space: nowrap; flex-sh
 /* ── Main: 3 columns ── */
 main {
   display: grid;
-  grid-template-columns: 155px 1fr 200px;
-  gap: 6px;
+  grid-template-columns: var(--left-w) 1fr var(--right-w);
+  gap: var(--gap);
   overflow: hidden;
   min-height: 0;
 }
@@ -100,7 +108,7 @@ aside, #farm-section {
 aside section {
   background: rgba(255,255,255,.75);
   border-radius: var(--radius);
-  padding: 8px 10px;
+  padding: clamp(5px, 1vw, 10px);
   box-shadow: 0 2px 8px var(--shadow);
   display: flex;
   flex-direction: column;
@@ -109,33 +117,32 @@ aside section {
 }
 
 aside h2 {
-  font-size: .82rem;
+  font-size: clamp(.7rem, 1.3vw, .85rem);
   color: var(--green-dark);
   border-bottom: 2px solid var(--green-light);
   padding-bottom: 3px;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   flex-shrink: 0;
 }
 
 /* ── Left panel ── */
 #left-panel { flex-shrink: 0; }
-
-#tool-panel { flex: 0 0 auto; }
+#tool-panel  { flex: 0 0 auto; }
 
 #tools {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 5px;
+  gap: 4px;
 }
 #tools .tool-btn:last-child:nth-child(odd) { grid-column: span 2; }
 
 .tool-btn {
-  padding: 7px 4px;
+  padding: clamp(4px, .8vh, 8px) 4px;
   border: 2px solid var(--green-mid);
   background: var(--white);
   border-radius: 6px;
   cursor: pointer;
-  font-size: .78rem;
+  font-size: clamp(.65rem, 1.2vw, .82rem);
   font-family: inherit;
   text-align: center;
   transition: background .12s;
@@ -149,10 +156,10 @@ aside h2 {
   flex: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
   overflow-y: auto;
   align-content: flex-start;
-  min-height: 30px;
+  min-height: 24px;
 }
 
 .inv-item {
@@ -162,26 +169,26 @@ aside h2 {
   background: #f0fdf4;
   border: 1px solid #ccc;
   border-radius: 5px;
-  padding: 3px 6px;
-  font-size: .65rem;
-  min-width: 42px;
+  padding: 2px 5px;
+  font-size: clamp(.58rem, 1vw, .68rem);
+  min-width: 38px;
   text-align: center;
 }
-.inv-item .inv-emoji { font-size: 1.2rem; }
+.inv-item .inv-emoji { font-size: clamp(1rem, 2vw, 1.3rem); }
 .inv-item .inv-count { color: #333; font-weight: 700; }
 .inv-item .inv-value { color: #888; }
 
 #sell-all-btn {
   flex-shrink: 0;
-  margin-top: 6px;
-  padding: 7px 6px;
+  margin-top: 5px;
+  padding: clamp(5px, .8vh, 8px) 6px;
   background: var(--gold);
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-family: inherit;
   font-weight: 700;
-  font-size: .78rem;
+  font-size: clamp(.65rem, 1.1vw, .82rem);
   width: 100%;
   transition: background .12s;
 }
@@ -192,25 +199,25 @@ aside h2 {
   background: rgba(255,255,255,.55);
   border-radius: var(--radius);
   box-shadow: 0 2px 8px var(--shadow);
-  padding: 6px;
+  padding: 5px;
   align-items: center;
   justify-content: center;
+  container-type: size;   /* 啟用 container queries，讓格子可以感知容器長寬 */
 }
 
 #farm-grid {
-  height: 100%;
-  width: auto;
-  aspect-ratio: 1;
-  max-width: 100%;
+  /* 同時設寬高，確保任何容器比例下都是完整正方形 */
+  width:  min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   grid-template-rows: repeat(6, 1fr);
-  gap: 5px;
+  gap: clamp(3px, .5cqmin, 6px);
 }
 
 /* ── Plot ── */
 .plot {
-  border-radius: 7px;
+  border-radius: clamp(4px, .8vmin, 8px);
   background: var(--soil);
   display: flex;
   flex-direction: column;
@@ -218,31 +225,35 @@ aside h2 {
   justify-content: center;
   cursor: pointer;
   position: relative;
-  border: 2px solid var(--soil-light);
+  border: clamp(1px, .3vmin, 3px) solid var(--soil-light);
   transition: transform .1s, box-shadow .1s;
   user-select: none;
   overflow: hidden;
 }
 .plot:hover { transform: scale(1.07); box-shadow: 0 3px 10px var(--shadow); }
 
-.plot .plot-emoji { font-size: 4rem; line-height: 1; }
+/* emoji 與文字全部用 clamp() 跟螢幕聯動 */
+.plot .plot-emoji {
+  font-size: clamp(1.5rem, 8vmin, 4rem);
+  line-height: 1;
+}
 .plot .plot-label {
-  font-size: .85rem;
+  font-size: clamp(0.55rem, 1.5vmin, 0.85rem);
   color: #fff;
   text-align: center;
-  margin-top: 3px;
-  text-shadow: 0 1px 4px #000;
-  line-height: 1.25;
-  max-width: 96%;
+  margin-top: 2px;
+  text-shadow: 0 1px 3px #000;
+  line-height: 1.2;
+  max-width: 95%;
   font-weight: 700;
 }
 
 /* Stage-based emoji sizes */
-.plot.planted .plot-emoji  { font-size: 2.6rem; opacity: .65; }
-.plot.growing .plot-emoji  { font-size: 3.5rem; opacity: .85; }
-.plot.watered .plot-emoji  { font-size: 3.7rem; opacity: .93; }
-.plot.ready   .plot-emoji  { font-size: 4.2rem; opacity: 1; }
-.plot.wilting .plot-emoji  { font-size: 3.5rem; }
+.plot.planted .plot-emoji  { font-size: clamp(0.9rem, 5vmin,  2.6rem); opacity: .65; }
+.plot.growing .plot-emoji  { font-size: clamp(1.2rem, 7vmin,  3.5rem); opacity: .85; }
+.plot.watered .plot-emoji  { font-size: clamp(1.3rem, 7.5vmin,3.7rem); opacity: .93; }
+.plot.ready   .plot-emoji  { font-size: clamp(1.6rem, 8.5vmin,4.2rem); opacity: 1;   }
+.plot.wilting .plot-emoji  { font-size: clamp(1.2rem, 7vmin,  3.5rem); }
 
 .plot.empty    { background: var(--soil); }
 .plot.planted  { background: #5d4037; border-color: #8d6e63; }
@@ -266,13 +277,13 @@ aside h2 {
 .plot-fertilized-badge {
   position: absolute;
   top: 1px; right: 2px;
-  font-size: .52rem;
+  font-size: clamp(.45rem, .9vmin, .6rem);
   pointer-events: none;
-  background: rgba(0,0,0,.35);
+  background: rgba(0,0,0,.4);
   border-radius: 3px;
   padding: 0 2px;
   color: #fff;
-  line-height: 1.3;
+  line-height: 1.4;
 }
 
 .plot-progress {
@@ -290,10 +301,8 @@ aside h2 {
 }
 
 /* ── Right panel ── */
-#seed-shop {
-  flex: 1;
-  min-height: 0;
-}
+#seed-shop  { flex: 1; min-height: 0; }
+#log-panel  { flex: 0 0 36%; min-height: 0; }
 
 #seed-list {
   display: flex;
@@ -301,14 +310,13 @@ aside h2 {
   gap: 4px;
   overflow-y: auto;
   flex: 1;
-  min-height: 0;
 }
 
 .seed-card {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 7px;
+  padding: clamp(3px, .6vh, 6px) 7px;
   border-radius: 6px;
   background: var(--green-light);
   border: 2px solid transparent;
@@ -320,33 +328,27 @@ aside h2 {
 .seed-card.selected { border-color: var(--green-dark); background: #74c69d; }
 .seed-card.locked-seed { opacity: .5; cursor: not-allowed; filter: grayscale(.8); }
 
-.seed-emoji { font-size: 1.3rem; flex-shrink: 0; }
-.seed-name  { flex: 1; font-size: .72rem; font-weight: 700; color: #333; }
-.seed-cost  { font-size: .68rem; color: var(--soil); font-weight: 700; flex-shrink: 0; }
-
-#log-panel { flex: 0 0 38%; }
+.seed-emoji { font-size: clamp(1rem, 2vw, 1.3rem); flex-shrink: 0; }
+.seed-name  { flex: 1; font-size: clamp(.62rem, 1.1vw, .78rem); font-weight: 700; color: #333; }
+.seed-cost  { font-size: clamp(.58rem, 1vw, .72rem); color: var(--soil); font-weight: 700; flex-shrink: 0; }
 
 #log-list {
   list-style: none;
   overflow-y: auto;
-  font-size: .7rem;
+  font-size: clamp(.6rem, 1.1vw, .72rem);
   flex: 1;
 }
 #log-list li { padding: 2px 0; border-bottom: 1px solid #eee; color: #444; line-height: 1.35; }
 #log-list li:first-child { color: var(--green-dark); font-weight: 700; }
 
-/* ── Weather display ── */
+/* ── Weather ── */
 #weather-display { transition: background .6s ease; font-weight: 700; }
 #weather-display.weather-sunny   { background: rgba(255,220,50,.30) !important; }
 #weather-display.weather-cloudy  { background: rgba(160,160,160,.30) !important; }
 #weather-display.weather-rainy   { background: rgba(30,120,220,.35)  !important; color: #ddf; }
 #weather-display.weather-drought { background: rgba(200,90,0,.35)    !important; color: #ffd; }
 #weather-display.weather-storm   { background: rgba(70,0,130,.40) !important; color: #ffe; animation: weather-storm-flash 2s ease-in-out infinite; }
-
-@keyframes weather-storm-flash {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: .6; }
-}
+@keyframes weather-storm-flash { 0%,100%{opacity:1} 50%{opacity:.6} }
 
 /* ── Modal ── */
 #modal-overlay {
@@ -356,7 +358,6 @@ aside h2 {
   z-index: 100;
 }
 #modal-overlay.hidden { display: none; }
-
 #modal {
   background: #fff;
   border-radius: var(--radius);
@@ -368,7 +369,6 @@ aside h2 {
 }
 #modal h3 { font-size: 1.1rem; margin-bottom: 10px; color: var(--green-dark); }
 #modal-body { font-size: .9rem; margin-bottom: 12px; line-height: 1.7; white-space: pre-line; }
-
 #modal-input {
   width: 100%;
   padding: 8px 12px;
@@ -382,37 +382,120 @@ aside h2 {
 }
 #modal-input:focus { border-color: var(--green-dark); }
 #modal-input.hidden { display: none; }
-
 #modal-actions { display: flex; gap: 8px; justify-content: center; }
 #modal-confirm {
-  padding: 7px 20px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: .9rem;
-  background: var(--green-dark);
-  color: #fff;
-  font-weight: 700;
+  padding: 7px 20px; border: none; border-radius: 6px;
+  cursor: pointer; font-family: inherit; font-size: .9rem;
+  background: var(--green-dark); color: #fff; font-weight: 700;
 }
 #modal-confirm.hidden { display: none; }
 #modal-close {
-  padding: 7px 20px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: .9rem;
-  background: var(--green-mid);
-  color: #fff;
+  padding: 7px 20px; border: none; border-radius: 6px;
+  cursor: pointer; font-family: inherit; font-size: .9rem;
+  background: var(--green-mid); color: #fff;
 }
 
-/* ── Responsive ── */
-@media (max-width: 700px) {
-  main { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
-  #left-panel  { flex-direction: row; }
-  #tool-panel  { flex: 1; }
-  #inventory-panel { flex: 1; }
-  #right-panel { flex-direction: row; }
-  #log-panel   { flex: 0 0 40%; }
+/* ════════════════════════════════════════════
+   RWD — 手機版 (≤ 600px)
+   佈局：垂直堆疊，全部可見，允許少量捲軸
+   ════════════════════════════════════════════ */
+@media (max-width: 600px) {
+  html, body { overflow-y: auto; height: auto; }
+
+  #app {
+    height: auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 5px 5px;
+    overflow: visible;
+  }
+
+  header {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 7px 10px;
+    gap: 6px;
+    border-radius: var(--radius);
+  }
+  header h1 { font-size: 1rem; }
+  #stats { font-size: .72rem; flex-wrap: wrap; }
+  #header-btns button { font-size: .85rem; padding: 4px 6px; }
+
+  main {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    overflow: visible;
+    height: auto;
+  }
+
+  /* 工具列：5個橫排 */
+  #left-panel {
+    flex-direction: row;
+    gap: 5px;
+    overflow: visible;
+  }
+  #tool-panel { flex: 1; min-height: 0; }
+  #tools {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+  }
+  #tools .tool-btn:last-child:nth-child(odd) { grid-column: span 1; }
+  .tool-btn { font-size: .72rem; padding: 8px 2px; }
+
+  /* 倉庫：緊縮 */
+  #inventory-panel {
+    flex: 0 0 auto;
+    max-height: 110px;
+  }
+
+  /* 農場：寬度決定正方形 */
+  #farm-section {
+    padding: 4px;
+    height: auto;
+    width: 100%;
+    aspect-ratio: 1;          /* 手機上 section 本身是正方形 */
+    container-type: size;
+  }
+  #farm-grid {
+    width:  min(100cqw, 100cqh);
+    height: min(100cqw, 100cqh);
+  }
+
+  /* 右側：橫排（種子捲動 ＋ 日誌） */
+  #right-panel {
+    flex-direction: row;
+    height: 160px;
+    gap: 5px;
+    overflow: hidden;
+  }
+  #seed-shop  { flex: 1; min-height: 0; }
+  #seed-list {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    gap: 5px;
+    scrollbar-width: thin;
+  }
+  .seed-card {
+    flex-direction: column;
+    min-width: 54px;
+    flex-shrink: 0;
+    text-align: center;
+    gap: 2px;
+    padding: 4px 5px;
+  }
+  .seed-name { font-size: .6rem; }
+  .seed-cost { font-size: .6rem; }
+  #log-panel { flex: 1; min-height: 0; }
+  #log-list  { font-size: .65rem; }
+}
+
+/* ── 超小螢幕 (≤ 360px) ── */
+@media (max-width: 360px) {
+  .tool-btn { font-size: .62rem; padding: 7px 1px; }
+  #stats span { padding: 2px 5px; font-size: .66rem; }
 }
