@@ -37,6 +37,34 @@ function defaultPlots() {
   return Array.from({length:TOTAL_PLOTS},(_,i)=>({id:i,status:'empty',cropKey:null,plantedAt:null,readyAt:null,watered:false,lastWateredAt:null,wiltStartAt:null,fertilized:false,fertCount:0,overWatered:false,deathCause:null}));
 }
 
+// ── Session timer & pause ────────────────────────────────────────────────────
+let isPaused = false;
+let sessionPlaySecs = 0;
+const REST_SECS = 20 * 60; // 20 分鐘
+
+function updateTimer() {
+  const el = document.getElementById('session-timer');
+  if (!el) return;
+  if (sessionPlaySecs >= REST_SECS) {
+    el.textContent = '該休息囉！';
+    el.className = 'timer-rest';
+  } else {
+    const m = String(Math.floor(sessionPlaySecs / 60)).padStart(2, '0');
+    const s = String(sessionPlaySecs % 60).padStart(2, '0');
+    el.textContent = `⏱ ${m}:${s}`;
+    el.className = '';
+  }
+}
+
+function togglePause() {
+  isPaused = !isPaused;
+  const btn = document.getElementById('pause-btn');
+  if (btn) { btn.textContent = isPaused ? '▶️' : '⏸'; btn.classList.toggle('active', isPaused); }
+  document.getElementById('pause-overlay')?.classList.toggle('visible', isPaused);
+  if (isPaused) AudioManager.toggleBg && AudioManager.isBgOn() && AudioManager.toggleBg();
+  else          AudioManager.toggleBg && !AudioManager.isBgOn() && AudioManager.toggleBg();
+}
+
 // ── Player management ────────────────────────────────────────────────────────
 const PLAYER_KEY = 'happyFarm_currentPlayer';
 function getPlayerName() { return localStorage.getItem(PLAYER_KEY) || ''; }
@@ -341,6 +369,9 @@ function weatherTick() {
 
 // ── Grow Tick ─────────────────────────────────────────────────────────────────
 function growTick() {
+  if (isPaused) return;
+  sessionPlaySecs++;
+  updateTimer();
   weatherTick();
   let changed=false;
   const t=now();
@@ -499,6 +530,7 @@ function init() {
   document.getElementById('modal-overlay').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-overlay')) closeModal(); });
 
   document.getElementById('player-btn').addEventListener('click', () => showPlayerModal(false));
+  document.getElementById('pause-btn').addEventListener('click', togglePause);
 
   document.getElementById('restart-btn').addEventListener('click', () => {
     showModal('🔄 重新開始', `確定要清除 ${getPlayerName()} 的所有進度重新開始嗎？`, {

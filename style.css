@@ -369,6 +369,49 @@ aside h2 {
 #log-list li { padding: 2px 0; border-bottom: 1px solid #eee; color: #444; line-height: 1.35; }
 #log-list li:first-child { color: var(--green-dark); font-weight: 700; }
 
+/* ── Session timer ── */
+#session-timer {
+  font-weight: 700;
+  letter-spacing: .5px;
+  transition: color .3s;
+}
+#session-timer.timer-rest {
+  color: #ff3333 !important;
+  background: rgba(255,50,50,.25) !important;
+  animation: timer-blink .7s ease-in-out infinite;
+}
+@keyframes timer-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .15; }
+}
+
+/* ── Pause overlay ── */
+#farm-section { position: relative; }
+
+#pause-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.52);
+  border-radius: var(--radius);
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+#pause-overlay.visible { display: flex; }
+#pause-overlay span {
+  color: #fff;
+  font-size: clamp(1.4rem, 4vmin, 2.8rem);
+  font-weight: 900;
+  text-shadow: 0 2px 12px rgba(0,0,0,.6);
+  letter-spacing: 2px;
+  animation: pause-pulse 1.8s ease-in-out infinite;
+}
+@keyframes pause-pulse {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%       { transform: scale(1.06); opacity: .75; }
+}
+
 /* ── Weather ── */
 #weather-display { transition: background .6s ease; font-weight: 700; }
 #weather-display.weather-sunny   { background: rgba(255,220,50,.30) !important; }

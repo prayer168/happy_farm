@@ -17,9 +17,11 @@
         <span>⭐ Lv.<strong id="level">1</strong></span>
         <span>EXP <span id="exp">0</span>/<span id="exp-next">800</span></span>
         <span id="weather-display">🌞 晴天</span>
+        <span id="session-timer">⏱ 00:00</span>
       </div>
       <div id="header-btns">
         <button id="player-btn" title="切換玩家">👤 ...</button>
+        <button id="pause-btn" title="暫停 / 繼續">⏸</button>
         <button id="bg-toggle" title="背景音樂">🎵</button>
         <button id="sfx-toggle" title="音效">🔊</button>
         <button id="restart-btn" title="重新開始">🔄</button>
@@ -57,6 +59,7 @@
       <!-- 中間：農場格 -->
       <section id="farm-section">
         <div id="farm-grid"></div>
+        <div id="pause-overlay"><span>⏸ 遊戲暫停</span></div>
       </section>
 
       <!-- 右側：種子商店 + 日誌 -->
