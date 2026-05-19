@@ -26,37 +26,45 @@
       </div>
     </header>
 
-    <!-- ── Toolbar ── -->
-    <div id="toolbar">
-      <div id="tools">
-        <button class="tool-btn active" data-tool="plant">🌱 種植</button>
-        <button class="tool-btn" data-tool="water">💧 澆水</button>
-        <button class="tool-btn" data-tool="harvest">🌾 收穫</button>
-        <button class="tool-btn" data-tool="fertilize">⚗️ 施肥</button>
-        <button class="tool-btn" data-tool="remove">🗑️ 清除</button>
-      </div>
-      <div id="seed-scroller">
-        <div id="seed-list"></div>
-      </div>
-      <button id="sell-all-btn">💰 全賣出</button>
-    </div>
-
-    <!-- ── Main ── -->
+    <!-- ── Main: 左側工具 | 農場 | 右側種子+日誌 ── -->
     <main>
+
+      <!-- 左側：工具 + 倉庫 -->
+      <aside id="left-panel">
+        <section id="tool-panel">
+          <h2>工具</h2>
+          <div id="tools">
+            <button class="tool-btn active" data-tool="plant">🌱 種植</button>
+            <button class="tool-btn" data-tool="water">💧 澆水</button>
+            <button class="tool-btn" data-tool="harvest">🌾 收穫</button>
+            <button class="tool-btn" data-tool="fertilize">⚗️ 施肥</button>
+            <button class="tool-btn" data-tool="remove">🗑️ 清除</button>
+          </div>
+        </section>
+        <section id="inventory-panel">
+          <h2>倉庫</h2>
+          <div id="inventory"></div>
+          <button id="sell-all-btn">賣出全部 (獲得金幣)</button>
+        </section>
+      </aside>
+
+      <!-- 中間：農場格 -->
       <section id="farm-section">
         <div id="farm-grid"></div>
       </section>
 
-      <aside id="sidebar">
-        <section id="inventory-panel">
-          <h2>倉庫</h2>
-          <div id="inventory"></div>
+      <!-- 右側：種子商店 + 日誌 -->
+      <aside id="right-panel">
+        <section id="seed-shop">
+          <h2>種子商店</h2>
+          <div id="seed-list"></div>
         </section>
         <section id="log-panel">
           <h2>農場日誌</h2>
           <ul id="log-list"></ul>
         </section>
       </aside>
+
     </main>
 
   </div>

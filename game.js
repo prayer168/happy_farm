@@ -62,7 +62,7 @@ function renderSeedShop() {
     const locked = crop.unlockLevel > state.level;
     const card = document.createElement('div');
     card.className = 'seed-card'+(locked?' locked-seed':'')+(state.selectedSeed===key&&!locked?' selected':'');
-    card.innerHTML = `<span class="seed-emoji">${crop.emoji}</span><span class="seed-name">${locked?`🔒${crop.unlockLevel}`:crop.name}</span><span class="seed-cost">🪙${crop.seedCost}</span>`;
+    card.innerHTML = `<span class="seed-emoji">${crop.emoji}</span><span class="seed-name">${locked?`🔒 等級${crop.unlockLevel}解鎖`:crop.name}</span><span class="seed-cost">🪙${crop.seedCost}</span>`;
     if (!locked) card.addEventListener('click', ()=>selectSeed(key));
     list.appendChild(card);
   }
