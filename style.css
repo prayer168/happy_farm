@@ -225,24 +225,24 @@ aside h2 {
 }
 .plot:hover { transform: scale(1.07); box-shadow: 0 3px 10px var(--shadow); }
 
-.plot .plot-emoji { font-size: 2.2rem; line-height: 1; }
+.plot .plot-emoji { font-size: 4rem; line-height: 1; }
 .plot .plot-label {
-  font-size: .68rem;
+  font-size: .85rem;
   color: #fff;
   text-align: center;
-  margin-top: 2px;
-  text-shadow: 0 1px 3px #000;
-  line-height: 1.2;
-  max-width: 92%;
-  font-weight: 600;
+  margin-top: 3px;
+  text-shadow: 0 1px 4px #000;
+  line-height: 1.25;
+  max-width: 96%;
+  font-weight: 700;
 }
 
 /* Stage-based emoji sizes */
-.plot.planted .plot-emoji  { font-size: 1.3rem;  opacity: .6; }
-.plot.growing .plot-emoji  { font-size: 1.85rem; opacity: .82; }
-.plot.watered .plot-emoji  { font-size: 2.0rem;  opacity: .93; }
-.plot.ready   .plot-emoji  { font-size: 2.3rem;  opacity: 1; }
-.plot.wilting .plot-emoji  { font-size: 1.9rem; }
+.plot.planted .plot-emoji  { font-size: 2.6rem; opacity: .65; }
+.plot.growing .plot-emoji  { font-size: 3.5rem; opacity: .85; }
+.plot.watered .plot-emoji  { font-size: 3.7rem; opacity: .93; }
+.plot.ready   .plot-emoji  { font-size: 4.2rem; opacity: 1; }
+.plot.wilting .plot-emoji  { font-size: 3.5rem; }
 
 .plot.empty    { background: var(--soil); }
 .plot.planted  { background: #5d4037; border-color: #8d6e63; }
