@@ -15,15 +15,26 @@ const CROPS = {
   mango:      { name:'芒果', emoji:'🥭', seedCost:500, sellPrice:1500, growTime:1500, waterBonus:420, expGain:600, unlockLevel:8, waterInterval:550, wiltGracePeriod:275, fertilizerCost:250 },
 };
 
-const LEVEL_EXP     = [0,100,250,500,900,1500,2500,4000,9999];
+const LEVEL_EXP     = [0, 800, 2500, 6000, 14000, 32000, 75000, 180000, 99999999];
+const MAX_VAL       = 99999999;
 const GRID_SIZE     = 6;
 const TOTAL_PLOTS   = GRID_SIZE * GRID_SIZE;
 const PLOTS_UNLOCKED= [12,18,24,30,36,36,36,36,36];
 
-let state = { coins:100, exp:0, level:1, selectedSeed:'radish', selectedTool:'plant', plots:[], inventory:{}, log:[] };
+// ── Weather definitions ───────────────────────────────────────────────────────
+const WEATHERS = {
+  sunny:   { name:'晴天',   emoji:'🌞', minDur:120, maxDur:300, waterMult:1.0  },
+  cloudy:  { name:'多雲',   emoji:'☁️', minDur:90,  maxDur:180, waterMult:1.15 },
+  rainy:   { name:'下雨',   emoji:'🌧️', minDur:60,  maxDur:120, waterMult:2.0, autoWater:25 },
+  drought: { name:'乾旱',   emoji:'🌵', minDur:90,  maxDur:180, waterMult:0.55 },
+  storm:   { name:'暴風雨', emoji:'⛈️', minDur:45,  maxDur:90,  waterMult:1.3, stormDmg:0.02 },
+};
+const WEATHER_POOL = ['sunny','sunny','sunny','cloudy','cloudy','rainy','drought','storm'];
+
+let state = { coins:100, exp:0, level:1, selectedSeed:'radish', selectedTool:'plant', plots:[], inventory:{}, log:[], weather:'sunny', weatherNextAt:0, lastAutoWaterAt:0 };
 
 function defaultPlots() {
-  return Array.from({length:TOTAL_PLOTS},(_,i)=>({id:i,status:'empty',cropKey:null,plantedAt:null,readyAt:null,watered:false,lastWateredAt:null,wiltStartAt:null,fertilized:false}));
+  return Array.from({length:TOTAL_PLOTS},(_,i)=>({id:i,status:'empty',cropKey:null,plantedAt:null,readyAt:null,watered:false,lastWateredAt:null,wiltStartAt:null,fertilized:false,fertCount:0,overWatered:false,deathCause:null}));
 }
 
 function saveState()  { localStorage.setItem('happyFarm', JSON.stringify(state)); }
@@ -32,6 +43,9 @@ function unlockedPlotCount() { return PLOTS_UNLOCKED[Math.min(state.level-1,PLOT
 function expToNextLevel()    { return LEVEL_EXP[Math.min(state.level,LEVEL_EXP.length-1)]; }
 function addLog(msg) { state.log.unshift(msg); if(state.log.length>30) state.log.pop(); renderLog(); }
 function now() { return Date.now(); }
+function effectiveWaterInterval(cropKey) {
+  return CROPS[cropKey].waterInterval * (WEATHERS[state.weather]?.waterMult ?? 1.0) * 1000;
+}
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 function renderStats() {
@@ -48,7 +62,7 @@ function renderSeedShop() {
     const locked = crop.unlockLevel > state.level;
     const card = document.createElement('div');
     card.className = 'seed-card'+(locked?' locked-seed':'')+(state.selectedSeed===key&&!locked?' selected':'');
-    card.innerHTML = `<span class="seed-emoji">${crop.emoji}</span><div class="seed-info"><div class="seed-name">${crop.name}${locked?` (等級${crop.unlockLevel}解鎖)`:''}</div><div class="seed-meta">⏱ ${crop.growTime}秒 &nbsp;💧${crop.waterInterval}秒/次 &nbsp;💰 售價 ${crop.sellPrice}</div></div><span class="seed-cost">🪙${crop.seedCost}</span>`;
+    card.innerHTML = `<span class="seed-emoji">${crop.emoji}</span><span class="seed-name">${locked?`🔒${crop.unlockLevel}`:crop.name}</span><span class="seed-cost">🪙${crop.seedCost}</span>`;
     if (!locked) card.addEventListener('click', ()=>selectSeed(key));
     list.appendChild(card);
   }
@@ -64,16 +78,21 @@ function renderFarm() {
   grid.innerHTML = '';
   state.plots.forEach((plot,i) => {
     const div = document.createElement('div');
-    div.className = 'plot '+plot.status;
+    div.className = 'plot '+plot.status+(plot.overWatered?' ow':'');
     div.dataset.id = i;
     let emoji='🟫', label='空地';
-    if (plot.status==='locked')        { emoji='🔒'; label='未解鎖'; }
-    else if (plot.status==='dead')     { emoji='💀'; label='已枯死'; }
+    if (plot.status==='locked') { emoji='🔒'; label='未解鎖'; }
+    else if (plot.status==='dead') {
+      const de = { thirst:'💀', overwater:'🫧', overfertilize:'☠️' };
+      const dl = { thirst:'枯死（缺水）', overwater:'溺斃（水太多）', overfertilize:'死亡（肥料中毒）' };
+      emoji = de[plot.deathCause] || '💀';
+      label = dl[plot.deathCause] || '已枯死';
+    }
     else if (plot.cropKey) {
       const crop=CROPS[plot.cropKey];
-      if      (plot.status==='planted')  { emoji='🌱'; label=crop.name; }
-      else if (plot.status==='growing')  { emoji='🌿'; label=crop.name; }
-      else if (plot.status==='watered')  { emoji='💧'; label=crop.name; }
+      if      (plot.status==='planted')  { emoji=crop.emoji; label=crop.name+'（剛種）'; }
+      else if (plot.status==='growing')  { emoji=crop.emoji; label=crop.name; }
+      else if (plot.status==='watered')  { emoji=crop.emoji; label=plot.overWatered?'⚠️水過多！':crop.name+'💧'; }
       else if (plot.status==='wilting')  { emoji='🥀'; label=crop.name+' 缺水！'; }
       else if (plot.status==='ready')    { emoji=crop.emoji; label='可收穫！'; }
     }
@@ -82,7 +101,8 @@ function renderFarm() {
       const pct=growProgress(plot);
       progressHTML=`<div class="plot-progress"><div class="plot-progress-bar" style="width:${pct}%"></div></div>`;
     }
-    const fertBadge=(plot.fertilized&&plot.status!=='ready'&&plot.status!=='empty'&&plot.status!=='locked')? '<span class="plot-fertilized-badge">⚗️</span>':'';
+    const fc = plot.fertCount || 0;
+    const fertBadge=(fc>0&&!['ready','empty','locked'].includes(plot.status))? `<span class="plot-fertilized-badge">⚗️${fc>1?'×'+fc:''}</span>`:'';
     div.innerHTML=`${fertBadge}<span class="plot-emoji">${emoji}</span><span class="plot-label">${label}</span>${progressHTML}`;
     div.addEventListener('click',()=>handlePlotClick(i));
     grid.appendChild(div);
@@ -115,7 +135,15 @@ function renderLog() {
   state.log.slice(0,15).forEach(msg=>{ const li=document.createElement('li'); li.textContent=msg; ul.appendChild(li); });
 }
 
-function render() { renderStats(); renderSeedShop(); renderFarm(); renderInventory(); }
+function renderWeather() {
+  const w = WEATHERS[state.weather] || WEATHERS.sunny;
+  const el = document.getElementById('weather-display');
+  if (!el) return;
+  el.textContent = `${w.emoji} ${w.name}`;
+  el.className = `weather-${state.weather}`;
+}
+
+function render() { renderStats(); renderSeedShop(); renderFarm(); renderInventory(); renderWeather(); }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 function selectSeed(key) { state.selectedSeed=key; renderSeedShop(); }
@@ -145,7 +173,7 @@ function doPlant(plot) {
   if (state.coins<crop.seedCost)    { addLog(`⚠️ 金幣不足！需要 ${crop.seedCost} 金幣`); showModal('金幣不足',`購買 ${crop.name} 種子需要 🪙${crop.seedCost}，你只有 🪙${state.coins}。`); return; }
   state.coins-=crop.seedCost;
   const t=now();
-  Object.assign(plot,{status:'planted',cropKey,plantedAt:t,readyAt:t+crop.growTime*1000,watered:false,lastWateredAt:t,wiltStartAt:null,fertilized:false});
+  Object.assign(plot,{status:'planted',cropKey,plantedAt:t,readyAt:t+crop.growTime*1000,watered:false,lastWateredAt:t,wiltStartAt:null,fertilized:false,fertCount:0,overWatered:false,deathCause:null});
   addLog(`🌱 種下了 ${crop.name}，記得每 ${crop.waterInterval} 秒澆水！`);
   AudioManager.sfxPlant();
 }
@@ -155,7 +183,21 @@ function doWater(plot) {
   if (plot.status==='dead')  { addLog('⚠️ 植物已枯死，澆水也沒用了，請清除後重新種植'); return; }
   if (plot.status==='ready') { addLog('✅ 這個作物已成熟，請收穫！'); return; }
   const crop=CROPS[plot.cropKey], t=now(), wasWilting=plot.status==='wilting';
-  plot.lastWateredAt=t; plot.watered=true; plot.wiltStartAt=null;
+  // 過度澆水檢查：在最小間隔（25% waterInterval）內再澆水為過量
+  if (!wasWilting && plot.lastWateredAt) {
+    const minGap = crop.waterInterval * 0.25 * 1000;
+    if (t - plot.lastWateredAt < minGap) {
+      if (plot.overWatered) {
+        plot.status='dead'; plot.deathCause='overwater';
+        addLog(`🫧 ${crop.emoji} ${crop.name} 溺斃了！根部腐爛，澆水過多所致！`);
+        AudioManager.sfxDead(); saveState(); render(); return;
+      }
+      plot.overWatered=true;
+      addLog(`⚠️ ${crop.name} 水分已足夠！再澆水植物會溺斃！`);
+      saveState(); render(); return;
+    }
+  }
+  plot.lastWateredAt=t; plot.watered=true; plot.wiltStartAt=null; plot.overWatered=false;
   plot.readyAt=Math.max(t+1000, plot.readyAt-crop.waterBonus*1000);
   if (wasWilting) { plot.status=growProgress(plot)>40?'growing':'planted'; addLog(`💧 澆水！${crop.name} 從枯萎中恢復，繼續生長`); }
   else            { plot.status='watered'; addLog(`💧 澆水！${crop.name} 加速成長 ${crop.waterBonus} 秒`); }
@@ -182,30 +224,43 @@ function doRemove(plot) {
 
 function doFertilize(plot) {
   if (plot.status==='empty'||plot.status==='locked') { addLog('⚠️ 這裡沒有作物可施肥'); return; }
-  if (plot.status==='dead')     { addLog('⚠️ 植物已枯死，無法施肥'); return; }
-  if (plot.status==='ready')    { addLog('✅ 作物已成熟，不需要施肥'); return; }
-  if (plot.fertilized)          { addLog('⚠️ 這塊地已施過肥，每次種植只能施肥一次'); return; }
-  if (plot.status==='wilting')  { addLog('⚠️ 植物正在枯萎，請先澆水再施肥'); return; }
-  const crop=CROPS[plot.cropKey], cost=crop.fertilizerCost;
-  if (state.coins<cost) { showModal('金幣不足',`施肥 ${crop.name} 需要 🪙${cost}，你只有 🪙${state.coins}。`); return; }
-  state.coins-=cost;
-  const remaining=plot.readyAt-now();
-  plot.readyAt=Math.max(now()+1000, plot.readyAt-Math.floor(remaining*0.4));
-  plot.fertilized=true;
-  addLog(`⚗️ 施肥！${crop.name} 成熟時間縮短 40%，花費 🪙${cost}`);
+  if (plot.status==='dead')    { addLog('⚠️ 植物已枯死，無法施肥'); return; }
+  if (plot.status==='ready')   { addLog('✅ 作物已成熟，不需要施肥'); return; }
+  if (plot.status==='wilting') { addLog('⚠️ 植物正在枯萎，請先澆水再施肥'); return; }
+  const crop=CROPS[plot.cropKey];
+  const fc = plot.fertCount || 0;
+  // 第3次施肥 → 肥料中毒死亡
+  if (fc >= 2) {
+    const cost = Math.floor(crop.fertilizerCost * 3);
+    if (state.coins < cost) { showModal('金幣不足',`施肥 ${crop.name} 需要 🪙${cost}，你只有 🪙${state.coins}。`); return; }
+    state.coins -= cost;
+    plot.status='dead'; plot.deathCause='overfertilize';
+    addLog(`☠️ 施肥過量！${crop.emoji} ${crop.name} 肥料中毒死亡！（第3次施肥）`);
+    AudioManager.sfxDead(); saveState(); render(); return;
+  }
+  const cost = Math.floor(crop.fertilizerCost * (fc === 0 ? 1 : 2));
+  if (state.coins < cost) { showModal('金幣不足',`施肥 ${crop.name} 需要 🪙${cost}，你只有 🪙${state.coins}。`); return; }
+  state.coins -= cost;
+  const reduction = fc === 0 ? 0.4 : 0.2;
+  const remaining = plot.readyAt - now();
+  plot.readyAt = Math.max(now()+1000, plot.readyAt - Math.floor(remaining * reduction));
+  plot.fertCount = fc + 1;
+  plot.fertilized = true;
+  addLog(`⚗️ 施肥（第${plot.fertCount}次）！${crop.name} 縮短 ${Math.round(reduction*100)}% 時間，🪙${cost}${fc===1?' ⚠️ 再施肥一次會中毒！':''}`);
   AudioManager.sfxFertilize();
 }
 
 function resetPlot(plot) {
-  Object.assign(plot,{status:'empty',cropKey:null,plantedAt:null,readyAt:null,watered:false,lastWateredAt:null,wiltStartAt:null,fertilized:false});
+  Object.assign(plot,{status:'empty',cropKey:null,plantedAt:null,readyAt:null,watered:false,lastWateredAt:null,wiltStartAt:null,fertilized:false,fertCount:0,overWatered:false,deathCause:null});
 }
 
 function gainExp(amount) {
-  state.exp+=amount;
+  state.exp = Math.min(state.exp + amount, MAX_VAL);
   const needed=expToNextLevel();
   if (state.exp>=needed && state.level<LEVEL_EXP.length-1) {
     state.exp-=needed; state.level+=1;
-    const bonus=state.level*50; state.coins+=bonus;
+    const bonus = Math.min(state.level * 500, MAX_VAL);
+    state.coins = Math.min(state.coins + bonus, MAX_VAL);
     addLog(`⭐ 升級！達到等級 ${state.level}，獲得 🪙${bonus} 金幣`);
     AudioManager.sfxLevelUp();
     showModal(`🎉 升級了！`,`恭喜升到 ⭐ 等級 ${state.level}！\n解鎖了更多農地，並獲得 🪙${bonus} 金幣獎勵！`);
@@ -219,16 +274,51 @@ function sellAll() {
     const crop=CROPS[key]; total+=crop.sellPrice*count; sold.push(`${crop.emoji}${crop.name} x${count}`); state.inventory[key]=0;
   }
   if (total===0) { addLog('⚠️ 倉庫是空的，沒有東西可以賣'); return; }
-  state.coins+=total;
+  state.coins = Math.min(state.coins + total, MAX_VAL);
   addLog(`💰 賣出 ${sold.join('、')}，獲得 🪙${total}`);
   AudioManager.sfxSell();
   saveState(); render();
 }
 
+// ── Weather Tick ──────────────────────────────────────────────────────────────
+function weatherTick() {
+  const t = now();
+  if (t < state.weatherNextAt) return;
+  let next = WEATHER_POOL[Math.floor(Math.random() * WEATHER_POOL.length)];
+  if (next === state.weather) next = WEATHER_POOL[Math.floor(Math.random() * WEATHER_POOL.length)];
+  state.weather = next;
+  const w = WEATHERS[next];
+  state.weatherNextAt = t + (w.minDur + Math.random() * (w.maxDur - w.minDur)) * 1000;
+  const msgs = {
+    sunny:   '🌞 天氣放晴，陽光普照！',
+    cloudy:  '☁️ 天空多雲，涼爽宜人',
+    rainy:   '🌧️ 開始下雨了！作物將自動獲得澆水',
+    drought: '🌵 乾旱來襲！作物需要更頻繁地澆水！',
+    storm:   '⛈️ 暴風雨警報！小心作物受損！',
+  };
+  addLog(msgs[next]);
+  renderWeather();
+}
+
 // ── Grow Tick ─────────────────────────────────────────────────────────────────
 function growTick() {
+  weatherTick();
   let changed=false;
   const t=now();
+
+  // Rain: auto-water all growing plots
+  if (state.weather === 'rainy' && t - (state.lastAutoWaterAt || 0) >= WEATHERS.rainy.autoWater * 1000) {
+    state.lastAutoWaterAt = t;
+    let anyWatered = false;
+    state.plots.forEach(p => {
+      if (!p.cropKey || ['ready','empty','locked','dead'].includes(p.status)) return;
+      p.lastWateredAt = t; p.watered = true; p.wiltStartAt = null;
+      if (p.status === 'wilting') p.status = growProgress(p) > 40 ? 'growing' : 'planted';
+      anyWatered = true;
+    });
+    if (anyWatered) { addLog('🌧️ 雨水滋潤農場，所有作物都澆到水了！'); changed = true; }
+  }
+
   state.plots.forEach(plot => {
     if (!plot.cropKey) return;
     if (['ready','empty','locked'].includes(plot.status)) return;
@@ -236,21 +326,44 @@ function growTick() {
     if (plot.status==='dead') return;
     if (plot.status==='wilting') {
       if (plot.wiltStartAt && t>=plot.wiltStartAt+crop.wiltGracePeriod*1000) {
-        plot.status='dead'; addLog(`💀 ${crop.emoji} ${crop.name} 枯死了！記得定時澆水`);
+        plot.status='dead'; plot.deathCause='thirst';
+        addLog(`💀 ${crop.emoji} ${crop.name} 枯死了（缺水）！`);
         AudioManager.sfxDead(); changed=true;
       }
       return;
     }
     if (t>=plot.readyAt) { plot.status='ready'; addLog(`✅ ${crop.emoji} ${crop.name} 成熟了，快去收穫！`); changed=true; return; }
-    if (plot.lastWateredAt && t>=plot.lastWateredAt+crop.waterInterval*1000) {
+    if (plot.lastWateredAt && t >= plot.lastWateredAt + effectiveWaterInterval(plot.cropKey)) {
       plot.status='wilting'; plot.wiltStartAt=t;
       addLog(`🥀 ${crop.emoji} ${crop.name} 開始枯萎，快去澆水！`);
       AudioManager.sfxWilt(); changed=true; return;
     }
+    // Storm: small chance to damage each growing plot
+    if (state.weather === 'storm' && ['planted','growing','watered'].includes(plot.status)) {
+      if (Math.random() < WEATHERS.storm.stormDmg) {
+        plot.status = 'wilting'; plot.wiltStartAt = t;
+        addLog(`⛈️ 暴風雨！${crop.emoji} ${crop.name} 受損開始枯萎！`);
+        AudioManager.sfxWilt(); changed = true; return;
+      }
+    }
     const newStatus=plot.watered?'watered':(growProgress(plot)>40?'growing':'planted');
+    // 過度澆水警告在過了安全時間後自動解除
+    if (plot.overWatered && plot.lastWateredAt && t - plot.lastWateredAt >= CROPS[plot.cropKey].waterInterval * 0.5 * 1000) {
+      plot.overWatered = false; changed = true;
+    }
     if (plot.status!==newStatus) { plot.status=newStatus; changed=true; }
   });
   if (changed) { saveState(); renderFarm(); renderStats(); }
+}
+
+// ── Reset Game ────────────────────────────────────────────────────────────────
+function resetGame() {
+  localStorage.removeItem('happyFarm');
+  Object.assign(state,{coins:100,exp:0,level:1,selectedSeed:'radish',selectedTool:'plant',plots:defaultPlots(),log:[],weather:'sunny',weatherNextAt:now()+60000,lastAutoWaterAt:0});
+  Object.keys(CROPS).forEach(k=>{state.inventory[k]=0;});
+  document.querySelectorAll('.tool-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.tool==='plant'));
+  render();
+  addLog('🌾 新遊戲開始！選種子開始你的農場之旅！');
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
@@ -269,13 +382,37 @@ function init() {
     if (plot.lastWateredAt===undefined) plot.lastWateredAt=null;
     if (plot.wiltStartAt===undefined)   plot.wiltStartAt=null;
     if (plot.fertilized===undefined)    plot.fertilized=false;
+    if (plot.fertCount===undefined)     plot.fertCount = plot.fertilized ? 1 : 0;
+    if (plot.overWatered===undefined)   plot.overWatered=false;
+    if (plot.deathCause===undefined)    plot.deathCause=null;
   });
   Object.keys(CROPS).forEach(k=>{ if(state.inventory[k]===undefined) state.inventory[k]=0; });
+  if (!state.weather)                    state.weather = 'sunny';
+  if (!state.weatherNextAt)              state.weatherNextAt = now() + 60000;
+  if (state.lastAutoWaterAt===undefined) state.lastAutoWaterAt = 0;
 
   document.querySelectorAll('.tool-btn').forEach(btn=>btn.addEventListener('click',()=>selectTool(btn.dataset.tool)));
   document.getElementById('sell-all-btn').addEventListener('click', sellAll);
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.getElementById('modal-overlay').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-overlay')) closeModal(); });
+
+  document.getElementById('restart-btn').addEventListener('click', () => {
+    showModal('🔄 重新開始', '確定放棄所有進度重新來過？（請再次點擊確認）');
+    let clicks=0;
+    const once = () => { clicks++; if(clicks>=1){ closeModal(); resetGame(); } document.getElementById('modal-close').removeEventListener('click', once); };
+    document.getElementById('modal-close').addEventListener('click', once);
+  });
+
+  const fsBtn = document.getElementById('fullscreen-btn');
+  if (fsBtn) {
+    fsBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+      else document.exitFullscreen?.();
+    });
+    document.addEventListener('fullscreenchange', () => {
+      fsBtn.textContent = document.fullscreenElement ? '⊠' : '⛶';
+    });
+  }
 
   // Audio: start context on first interaction (browser autoplay policy)
   document.body.addEventListener('click', ()=>AudioManager.start(), {once:true});

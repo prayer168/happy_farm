@@ -2,54 +2,56 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>開心農場</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
+
+    <!-- ── Header ── -->
     <header>
       <h1>🌾 開心農場</h1>
-      <div id="audio-controls">
+      <div id="stats">
+        <span>🪙 <strong id="coins">100</strong></span>
+        <span>⭐ Lv.<strong id="level">1</strong></span>
+        <span>EXP <span id="exp">0</span>/<span id="exp-next">800</span></span>
+        <span id="weather-display">🌞 晴天</span>
+      </div>
+      <div id="header-btns">
         <button id="bg-toggle" title="背景音樂">🎵</button>
         <button id="sfx-toggle" title="音效">🔊</button>
-      </div>
-      <div id="stats">
-        <span id="coins-display">🪙 <span id="coins">100</span> 金幣</span>
-        <span id="level-display">⭐ 等級 <span id="level">1</span></span>
-        <span id="exp-display">經驗 <span id="exp">0</span> / <span id="exp-next">100</span></span>
+        <button id="restart-btn" title="重新開始">🔄</button>
+        <button id="fullscreen-btn" title="全螢幕">⛶</button>
       </div>
     </header>
 
+    <!-- ── Toolbar ── -->
+    <div id="toolbar">
+      <div id="tools">
+        <button class="tool-btn active" data-tool="plant">🌱 種植</button>
+        <button class="tool-btn" data-tool="water">💧 澆水</button>
+        <button class="tool-btn" data-tool="harvest">🌾 收穫</button>
+        <button class="tool-btn" data-tool="fertilize">⚗️ 施肥</button>
+        <button class="tool-btn" data-tool="remove">🗑️ 清除</button>
+      </div>
+      <div id="seed-scroller">
+        <div id="seed-list"></div>
+      </div>
+      <button id="sell-all-btn">💰 全賣出</button>
+    </div>
+
+    <!-- ── Main ── -->
     <main>
       <section id="farm-section">
-        <h2>我的農場</h2>
         <div id="farm-grid"></div>
       </section>
 
       <aside id="sidebar">
-        <section id="seed-shop">
-          <h2>種子商店</h2>
-          <div id="seed-list"></div>
-        </section>
-
-        <section id="tool-panel">
-          <h2>工具</h2>
-          <div id="tools">
-            <button class="tool-btn active" data-tool="plant" title="種植">🌱 種植</button>
-            <button class="tool-btn" data-tool="water" title="澆水">💧 澆水</button>
-            <button class="tool-btn" data-tool="harvest" title="收穫">🌾 收穫</button>
-            <button class="tool-btn" data-tool="fertilize" title="施肥">⚗️ 施肥</button>
-            <button class="tool-btn" data-tool="remove" title="清除">🗑️ 清除</button>
-          </div>
-        </section>
-
         <section id="inventory-panel">
           <h2>倉庫</h2>
           <div id="inventory"></div>
-          <button id="sell-all-btn">賣出全部 (獲得金幣)</button>
         </section>
-
         <section id="log-panel">
           <h2>農場日誌</h2>
           <ul id="log-list"></ul>
@@ -57,12 +59,14 @@
       </aside>
     </main>
 
-    <div id="modal-overlay" class="hidden">
-      <div id="modal">
-        <h3 id="modal-title"></h3>
-        <div id="modal-body"></div>
-        <button id="modal-close">關閉</button>
-      </div>
+  </div>
+
+  <!-- ── Modal ── -->
+  <div id="modal-overlay" class="hidden">
+    <div id="modal">
+      <h3 id="modal-title"></h3>
+      <div id="modal-body"></div>
+      <button id="modal-close">關閉</button>
     </div>
   </div>
 
