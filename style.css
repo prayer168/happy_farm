@@ -171,6 +171,60 @@ header h1 {
 #restart-btn { background: #7f1d1d; border-color: #fecaca; }
 #restart-btn:hover { background: #9f1239; }
 #help-btn { background: rgba(255, 255, 255, .24); }
+#header-btns .header-link {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, .16);
+  border: 1px solid rgba(255, 255, 255, .45);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  min-height: 36px;
+  font-size: clamp(.78rem, 1.3vw, .92rem);
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+}
+#header-btns .header-link:hover { background: rgba(255, 255, 255, .3); }
+.save-group {
+  order: 2;
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, .22);
+  border: 1px solid rgba(255, 255, 255, .4);
+}
+header h1, #stats, #header-btns { order: 1; }
+.save-group button {
+  background: var(--gold);
+  color: #1a1a1a;
+  border: 1px solid #ffe8a3;
+  border-radius: 8px;
+  padding: 6px 10px;
+  min-height: 36px;
+  cursor: pointer;
+  font-size: clamp(.78rem, 1.3vw, .92rem);
+  font-weight: 800;
+}
+.save-group button:hover { background: #ffd54f; }
+#save-status {
+  color: #fff;
+  font-size: clamp(.72rem, 1.15vw, .84rem);
+  font-weight: 800;
+  padding: 4px 8px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .12);
+}
+#save-status.just-saved { background: var(--gold); color: #1a1a1a; }
+#save-status.is-error { background: #7f1d1d; color: #fff; }
 
 .sound-group {
   display: flex;
@@ -342,6 +396,30 @@ aside h2::before {
   line-height: 1.25;
 }
 #sell-all-btn:hover { background: #ffca28; }
+#harvest-all-btn {
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding: 8px 6px;
+  min-height: 40px;
+  background: var(--green-dark);
+  color: #fff;
+  border: 2px solid var(--green-dark);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: clamp(.72rem, 1.1vw, .86rem);
+  width: 100%;
+}
+#harvest-all-btn:hover { background: var(--green-mid); }
+#harvest-summary {
+  min-height: 1.2em;
+  margin-top: 6px;
+  font-size: .78rem;
+  font-weight: 800;
+  color: var(--green-dark);
+  line-height: 1.4;
+}
+#tool-panel { flex: 0 0 auto; overflow: visible; }
 
 /* ── Farm section (center) ── */
 #farm-section {
@@ -817,7 +895,13 @@ body[data-weather="storm"] #weather-fx {
   header h1 { font-size: 1.05rem; }
   #stats { font-size: .78rem; flex-wrap: nowrap; }
   #header-btns { width: 100%; }
-  #header-btns button { min-height: 44px; min-width: 44px; font-size: .85rem; padding: 8px 10px; }
+  #header-btns button, #header-btns .header-link, .save-group button {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: .85rem;
+    padding: 8px 10px;
+  }
+  #save-status { min-height: 44px; font-size: .85rem; }
 
   main {
     display: flex;
@@ -843,7 +927,7 @@ body[data-weather="storm"] #weather-fx {
 
   #inventory-panel { flex: 0 0 auto; max-height: 160px; }
   #leaderboard-panel { flex: 0 0 auto; max-height: 200px; }
-  #sell-all-btn { min-height: 48px; font-size: .9rem; }
+  #sell-all-btn, #harvest-all-btn { min-height: 48px; font-size: .9rem; }
 
   #farm-section {
     padding: 8px;
@@ -897,6 +981,104 @@ body[data-weather="storm"] #weather-fx {
 }
 
 @media (forced-colors: active) {
-  .tool-btn, .seed-card, button, .plot { border: 1px solid ButtonText; }
+  .tool-btn, .seed-card, button, .plot, #save-status { border: 1px solid ButtonText; }
   .tool-btn.active { forced-color-adjust: none; background: Highlight; color: HighlightText; }
 }
+
+#app[hidden],
+#login-screen[hidden],
+#login-form[hidden],
+#login-setup[hidden],
+#admin-link[hidden],
+#admin-app[hidden],
+#import-line[hidden],
+#password-result[hidden],
+.secret-dialog[hidden] { display: none !important; }
+
+body.logged-out { overflow: auto; height: auto; min-height: 100%; }
+body.logged-out #app { display: none !important; }
+
+#login-screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.login-card, .admin-card {
+  width: min(440px, 100%);
+  background: rgba(255, 255, 255, .96);
+  color: var(--ink);
+  border-radius: 16px;
+  padding: 22px 18px;
+  box-shadow: 0 12px 36px var(--shadow);
+}
+.login-card h1, .admin-head h1 { color: var(--green-dark); font-size: 1.7rem; margin-bottom: 8px; }
+.admin-head h1, .admin-page .admin-kicker { color: #fff; }
+.login-kicker, .admin-kicker {
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  color: var(--green-mid);
+}
+#login-lead, .login-or, .admin-card p { line-height: 1.6; margin-bottom: 12px; }
+#google-login, #password-login, #login-setup button, .admin-card button, .admin-text-btn {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 2px solid var(--green-dark);
+  background: var(--green-dark);
+  color: #fff;
+  font-weight: 800;
+  padding: 8px 12px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+#password-login, #login-setup button[type="submit"] { width: 100%; margin-top: 8px; }
+#google-login, #admin-google { width: 100%; background: #fff; color: var(--green-dark); }
+#setup-cancel, #admin-logout, .admin-text-btn, #reload-roster, #download-passwords, #secret-close {
+  background: #fff;
+  color: var(--green-dark);
+}
+.login-card label, .admin-card label { display: block; font-weight: 800; margin: 10px 0 4px; }
+.login-card label.check-line, .admin-card label.check-line { display: flex; align-items: center; gap: 8px; }
+.login-card input, .admin-card textarea, .admin-card input[type="text"], .admin-card input[type="password"] {
+  width: 100%;
+  min-height: 44px;
+  border: 2px solid var(--green-mid);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  background: #fff;
+  color: var(--ink);
+}
+.admin-card textarea { min-height: 140px; resize: vertical; }
+.check-line { display: flex !important; align-items: center; gap: 8px; font-weight: 700; }
+.check-line input { width: 20px; height: 20px; }
+.form-error { min-height: 1.4em; color: #7f1d1d; font-weight: 800; }
+#login-setup button { margin-top: 8px; }
+.admin-page { overflow: auto; height: auto; }
+.admin-shell { max-width: 980px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.admin-head, .admin-card-head, .admin-head-actions, .admin-actions { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.admin-card { width: 100%; }
+.admin-card h2 { color: var(--green-dark); margin-bottom: 8px; }
+.table-wrap { overflow-x: auto; }
+.admin-card table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.admin-card th, .admin-card td { border-bottom: 1px solid #d8f3dc; text-align: left; padding: 8px 6px; vertical-align: middle; }
+.admin-card td button { margin: 2px; }
+.danger-btn { background: #7f1d1d !important; border-color: #7f1d1d !important; color: #fff !important; }
+.file-btn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.secret-dialog {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 120;
+}
+.secret-dialog .admin-card { width: min(440px, 100%); }
+.secret-dialog button { margin: 8px 8px 0 0; }

@@ -51,12 +51,13 @@ empty → planted → growing ⟷ watered → ready → (harvest) → empty
 
 ### 玩家與存檔系統
 
-- 目前玩家名稱存於 `localStorage['happyFarm_currentPlayer']`
-- 每位玩家的存檔 key 為 `happyFarm_save_{name}`
-- `getPlayerName()` / `setPlayerName(n)` / `getSaveKey()` 三個 helper
-- 首次開啟（無玩家名）強制顯示 `showPlayerModal(required=true)`
-- 切換玩家時先 `saveState()` 再重設 state 再 `loadState()` 載入目標玩家
-- **向前相容**：新增 plot 欄位必須在 `init()` backfill 區段補上 `if (plot.xxx === undefined) plot.xxx = defaultValue`
+- 未登入只看得到登入畫面。Google 登入，或老師批次建立的帳號密碼
+- 管理者只有 `prayer168@gmail.com`，而且必須 `email_verified`。這條寫在 `firestore.rules` 和 `functions/index.js`，不是只靠畫面隱藏
+- 進度存在 Firestore `players/{uid}`。前十名讀 `leaderboard/{uid}`，那裡只有顯示名稱、等級、金幣
+- `saveState('manual'|'auto'|'now')` 會同步到雲端。畫面上有「存檔」按鈕和同步狀態
+- 第一次登入若這台電腦有同名的舊 `localStorage` 進度，可以選擇搬上雲端
+- 帳號建立、重設密碼、刪除帳號在 Cloud Functions，密碼只回傳一次，不寫進 Firestore
+- **向前相容**：雲端讀回後由 `normalizeLoaded()` 補上新的 plot 欄位
 
 ### 天氣系統
 

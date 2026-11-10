@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>開心農場管理</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="admin-page logged-out">
+  <main class="admin-shell">
+    <header class="admin-head">
+      <div>
+        <p class="admin-kicker">管理者</p>
+        <h1>開心農場帳號</h1>
+      </div>
+      <div class="admin-head-actions">
+        <a class="admin-text-btn" href="index.html">回農場</a>
+        <button id="admin-logout" type="button" hidden>登出</button>
+      </div>
+    </header>
+
+    <section id="admin-login" class="admin-card">
+      <h2>管理者登入</h2>
+      <p>只有老師的 Google 帳號可以進入。學生的帳號看不到這裡的資料。</p>
+      <button id="admin-google" type="button">使用 Google 帳號登入</button>
+      <p id="admin-login-error" class="form-error" role="alert"></p>
+    </section>
+
+    <section id="admin-app" hidden>
+      <section class="admin-card">
+        <h2>批次建立帳號</h2>
+        <p>一行一個。可以貼上或匯入 CSV。密碼留白就自動產生。密碼只在建立當下出現，請立刻下載交給學生。</p>
+        <label for="account-text">帳號清單</label>
+        <textarea id="account-text" rows="8" spellcheck="false" placeholder="帳號,密碼&#10;anna,&#10;博文,apple42"></textarea>
+        <label class="check-line"><input id="generate-missing" type="checkbox" checked> 沒有填密碼的帳號，自動產生密碼</label>
+        <div class="admin-actions">
+          <button id="create-accounts" type="button">建立帳號</button>
+          <label class="admin-text-btn file-btn">匯入 CSV
+            <input id="csv-file" type="file" accept=".csv,text/csv,text/plain">
+          </label>
+        </div>
+        <p id="create-error" class="form-error" role="alert"></p>
+        <div id="password-result" hidden>
+          <p><strong>請立刻保存這些密碼。</strong>離開這個畫面後就無法再查看，系統也不保存明文密碼。</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>帳號</th><th>密碼</th></tr></thead>
+              <tbody id="password-table"></tbody>
+            </table>
+          </div>
+          <button id="download-passwords" type="button">下載密碼 CSV</button>
+        </div>
+      </section>
+
+      <section class="admin-card">
+        <div class="admin-card-head">
+          <h2>玩家與進度</h2>
+          <button id="reload-roster" type="button">重新整理</button>
+        </div>
+        <p id="roster-error" class="form-error" role="alert"></p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>顯示名稱</th>
+                <th>登入帳號</th>
+                <th>等級</th>
+                <th>金幣</th>
+                <th>上次存檔</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="roster-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+  <div id="secret-result" class="secret-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="secret-title">
+    <div class="admin-card">
+      <h2 id="secret-title">新密碼</h2>
+      <p id="secret-body"></p>
+      <button id="secret-download" type="button">下載密碼</button>
+      <button id="secret-close" type="button">我已保存</button>
+    </div>
+  </div>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="cloud.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
