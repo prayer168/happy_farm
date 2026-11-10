@@ -75,7 +75,18 @@ function getPlayerName() { return localStorage.getItem(PLAYER_KEY) || ''; }
 function setPlayerName(n) { localStorage.setItem(PLAYER_KEY, n.trim()); }
 function getSaveKey()     { return 'happyFarm_save_' + (getPlayerName() || '_'); }
 
-function saveState()  { if (!getPlayerName()) return; localStorage.setItem(getSaveKey(), JSON.stringify(state)); }
+function saveState() {
+  if (!getPlayerName()) return false;
+  const status = document.getElementById('save-status');
+  try {
+    localStorage.setItem(getSaveKey(), JSON.stringify(state));
+    if (status) status.textContent = '已儲存 ' + new Date().toLocaleTimeString('zh-TW', { hour12: false });
+    return true;
+  } catch {
+    if (status) status.textContent = '儲存失敗，請確認瀏覽器允許儲存資料';
+    return false;
+  }
+}
 function loadState()  { try { const s=localStorage.getItem(getSaveKey()); if(s) Object.assign(state,JSON.parse(s)); } catch(e){} }
 function unlockedPlotCount() { return PLOTS_UNLOCKED[Math.min(state.level-1,PLOTS_UNLOCKED.length-1)]; }
 function expToNextLevel()    { return LEVEL_EXP[Math.min(state.level,LEVEL_EXP.length-1)]; }
@@ -582,6 +593,58 @@ function closeModal() {
   if (back && typeof back.focus === 'function' && document.contains(back)) back.focus();
 }
 
+function showSaveManager() {
+  saveState();
+  showModal('本機後台管理', '這個瀏覽器的玩家存檔。刪除後無法復原。');
+  const list = document.createElement('div');
+  list.className = 'save-manager-list';
+  const keys = Object.keys(localStorage).filter(key => key.startsWith('happyFarm_save_')).sort();
+  keys.forEach(key => {
+    const name = key.slice('happyFarm_save_'.length);
+    const row = document.createElement('div');
+    row.className = 'save-manager-row';
+    const details = document.createElement('span');
+    details.textContent = name + (name === getPlayerName() ? '（目前玩家）' : '');
+    try {
+      const saved = JSON.parse(localStorage.getItem(key));
+      const summary = document.createElement('small');
+      summary.textContent = '等級 ' + (saved.level || 1) + '・金幣 ' + (saved.coins || 0);
+      details.appendChild(summary);
+    } catch {
+      details.append('・存檔無法讀取');
+    }
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = '刪除';
+    remove.setAttribute('aria-label', '刪除玩家 ' + name);
+    remove.addEventListener('click', () => {
+      showModal('刪除玩家資料', '確定要刪除「' + name + '」的存檔與排行榜資料嗎？刪除後無法復原。', {
+        confirmText: '刪除玩家資料',
+        closeText: '取消',
+        onConfirm: () => {
+          try {
+            const isCurrent = name === getPlayerName();
+            localStorage.removeItem(key);
+            if (isCurrent) {
+              localStorage.removeItem(PLAYER_KEY);
+              location.reload();
+              return;
+            }
+            renderLeaderboard();
+            showSaveManager();
+          } catch {
+            showModal('無法刪除', '請確認瀏覽器允許修改儲存資料，然後再試一次。');
+          }
+        }
+      });
+    });
+    row.append(details, remove);
+    list.appendChild(row);
+  });
+  if (!keys.length) list.textContent = '目前沒有玩家存檔。';
+  document.getElementById('modal-body').appendChild(list);
+}
+
 // ── Player modal ──────────────────────────────────────────────────────────────
 function showPlayerModal(required = false) {
   const current = getPlayerName();
@@ -751,6 +814,15 @@ function init() {
     const closeBtn = document.getElementById('modal-close');
     if (closeBtn && closeBtn.style.display === 'none') return;
     closeModal();
+  });
+
+  document.getElementById('manage-saves-btn').addEventListener('click', showSaveManager);
+  document.getElementById('save-btn').addEventListener('click', () => {
+    if (!getPlayerName()) { showPlayerModal(true); return; }
+    if (saveState()) addLog('進度已儲存在這個瀏覽器。');
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) saveState();
   });
 
   document.getElementById('player-btn').addEventListener('click', () => showPlayerModal(false));
