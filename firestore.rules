@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'prayer168@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    function validName(name) {
+      return name is string && name.size() >= 1 && name.size() <= 12;
+    }
+    function validInt(n, min, max) {
+      return n is int && n >= min && n <= max;
+    }
+    function isCrop(key) {
+      return key in [
+        'radish', 'tomato', 'corn', 'strawberry', 'watermelon', 'pumpkin',
+        'bellpepper', 'eggplant', 'blueberry', 'peach', 'mango'
+      ];
+    }
+    function plotsOk(plots) {
+      return plots is list && plots.size() == 36;
+    }
+    function inventoryOk(inv) {
+      return inv is map
+        && inv.keys().hasOnly(['radish', 'tomato', 'corn', 'strawberry', 'watermelon', 'pumpkin', 'bellpepper', 'eggplant', 'blueberry', 'peach', 'mango'])
+        && validInt(inv.radish, 0, 99999999)
+        && validInt(inv.tomato, 0, 99999999)
+        && validInt(inv.corn, 0, 99999999)
+        && validInt(inv.strawberry, 0, 99999999)
+        && validInt(inv.watermelon, 0, 99999999)
+        && validInt(inv.pumpkin, 0, 99999999)
+        && validInt(inv.bellpepper, 0, 99999999)
+        && validInt(inv.eggplant, 0, 99999999)
+        && validInt(inv.blueberry, 0, 99999999)
+        && validInt(inv.peach, 0, 99999999)
+        && validInt(inv.mango, 0, 99999999);
+    }
+    function logOk(log) {
+      return log is list && log.size() <= 30;
+    }
+    function playerOk(data) {
+      return data.keys().hasOnly([
+          'displayName', 'level', 'exp', 'coins', 'selectedSeed', 'selectedTool',
+          'plots', 'inventory', 'log', 'weather', 'weatherNextAt', 'lastAutoWaterAt', 'updatedAt'
+        ])
+        && validName(data.displayName)
+        && validInt(data.level, 1, 8)
+        && validInt(data.exp, 0, 99999999)
+        && validInt(data.coins, 0, 99999999)
+        && isCrop(data.selectedSeed)
+        && data.selectedTool in ['plant', 'water', 'harvest', 'fertilize', 'remove']
+        && plotsOk(data.plots)
+        && inventoryOk(data.inventory)
+        && logOk(data.log)
+        && data.weather in ['sunny', 'cloudy', 'rainy', 'drought', 'storm']
+        && validInt(data.weatherNextAt, 0, 9999999999999)
+        && validInt(data.lastAutoWaterAt, 0, 9999999999999)
+        && data.updatedAt == request.time;
+    }
+    function boardOk(data, uid) {
+      return data.keys().hasOnly(['displayName', 'level', 'coins'])
+        && exists(/databases/$(database)/documents/players/$(uid))
+        && validName(data.displayName)
+        && validInt(data.level, 1, 8)
+        && validInt(data.coins, 0, 99999999)
+        && data.displayName == get(/databases/$(database)/documents/players/$(uid)).data.displayName
+        && data.level == get(/databases/$(database)/documents/players/$(uid)).data.level
+        && data.coins == get(/databases/$(database)/documents/players/$(uid)).data.coins;
+    }
+
+    match /players/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      allow list: if isAdmin();
+      allow create, update: if isOwner(uid) && playerOk(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /leaderboard/{uid} {
+      allow get, list: if signedIn();
+      allow create, update: if isOwner(uid) && boardOk(request.resource.data, uid);
+      allow delete: if isAdmin();
+    }
+
+    match /accounts/{uid} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if false;
+    }
+  }
+}

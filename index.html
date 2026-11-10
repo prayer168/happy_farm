@@ -6,9 +6,41 @@
   <title>開心農場</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body data-weather="sunny">
+<body data-weather="sunny" class="logged-out">
   <a class="skip-link" href="#farm-grid">跳到農場</a>
-  <div id="app">
+  <section id="login-screen" aria-labelledby="login-title">
+    <div class="login-card">
+      <p class="login-kicker">教室裡的農場</p>
+      <h1 id="login-title">🌾 開心農場</h1>
+      <p id="login-lead">請先登入。進度存在雲端，換一台電腦登入就能接著玩。</p>
+      <div id="login-form">
+        <button id="google-login" type="button">使用 Google 帳號登入</button>
+        <p class="login-or">或使用老師發的帳號</p>
+        <form id="password-form">
+          <label for="login-username">帳號</label>
+          <input id="login-username" name="username" type="text" maxlength="12" autocomplete="username" required>
+          <label for="login-password">密碼</label>
+          <input id="login-password" name="password" type="password" minlength="6" autocomplete="current-password" required>
+          <button id="password-login" type="submit">登入</button>
+        </form>
+        <p id="login-error" class="form-error" role="alert"></p>
+      </div>
+      <form id="login-setup" hidden>
+        <h2>取一個農場名字</h2>
+        <label for="display-name">顯示名稱</label>
+        <input id="display-name" type="text" maxlength="12" autocomplete="nickname" required>
+        <label id="import-line" class="check-line" hidden>
+          <input id="import-local" type="checkbox" checked>
+          把這台電腦上同名的舊進度搬到雲端
+        </label>
+        <p id="import-note"></p>
+        <button type="submit">開始遊戲</button>
+        <button id="setup-cancel" type="button">改用其他帳號</button>
+        <p id="setup-error" class="form-error" role="alert"></p>
+      </form>
+    </div>
+  </section>
+  <div id="app" hidden>
 
     <!-- ── Header ── -->
     <header>
@@ -21,7 +53,9 @@
         <span id="session-timer">⏱ 00:00</span>
       </div>
       <div id="header-btns">
-        <button id="player-btn" type="button" title="切換玩家" aria-label="切換玩家">👤 ...</button>
+        <button id="player-btn" type="button" title="更改顯示名稱" aria-label="更改顯示名稱">👤 ...</button>
+        <button id="logout-btn" type="button">登出</button>
+        <a id="admin-link" class="header-link" href="admin.html" hidden>管理</a>
         <button id="pause-btn" type="button" title="暫停" aria-label="暫停遊戲" aria-pressed="false">⏸</button>
         <div class="sound-group" role="group" aria-label="聲音">
           <button id="bg-toggle" type="button" title="背景音樂" aria-pressed="false" aria-label="開啟背景音樂"><span aria-hidden="true">🎵</span><span class="btn-label">音樂關</span></button>
@@ -30,6 +64,10 @@
         <button id="help-btn" type="button" title="開啟教學" aria-label="開啟教學">❓ 教學</button>
         <button id="restart-btn" type="button" title="重新開始遊戲" aria-label="重玩">🔄 重玩</button>
         <button id="fullscreen-btn" type="button" title="全螢幕" aria-label="進入全螢幕" aria-pressed="false">⛶</button>
+      </div>
+      <div class="save-group" role="group" aria-label="雲端存檔">
+        <button id="save-btn" type="button" title="立刻同步到雲端">💾 存檔</button>
+        <span id="save-status" role="status" aria-live="polite" aria-atomic="true">尚未同步</span>
       </div>
     </header>
 
@@ -47,6 +85,8 @@
             <button class="tool-btn" type="button" data-tool="fertilize" aria-pressed="false">⚗️ 施肥</button>
             <button class="tool-btn" type="button" data-tool="remove" aria-pressed="false">🗑️ 清除</button>
           </div>
+          <button id="harvest-all-btn" type="button">🌾 全部收穫</button>
+          <p id="harvest-summary" role="status" aria-live="polite"></p>
         </section>
         <section id="inventory-panel" aria-labelledby="inventory-heading">
           <h2 id="inventory-heading">倉庫</h2>
@@ -116,6 +156,12 @@
     </div>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="cloud.js"></script>
   <script src="audio.js"></script>
   <script src="game.js"></script>
   <script src="https://prayer168.github.io/science-portal/assets/material-visit-count.js" data-material="https://prayer168.github.io/happy_farm/" defer></script>

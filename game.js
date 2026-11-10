@@ -70,13 +70,77 @@ function togglePause() {
 }
 
 // ── Player management ────────────────────────────────────────────────────────
-const PLAYER_KEY = 'happyFarm_currentPlayer';
-function getPlayerName() { return localStorage.getItem(PLAYER_KEY) || ''; }
-function setPlayerName(n) { localStorage.setItem(PLAYER_KEY, n.trim()); }
-function getSaveKey()     { return 'happyFarm_save_' + (getPlayerName() || '_'); }
+let currentPlayerName = '';
+let lastSavedAt = 0;
+let syncError = false;
+let manualFlashUntil = 0;
+let saveStatusTimer = null;
+let saveDebounce = null;
+let saveFlight = null;
+let saveQueued = false;
+let loopsStarted = false;
 
-function saveState()  { if (!getPlayerName()) return; localStorage.setItem(getSaveKey(), JSON.stringify(state)); }
-function loadState()  { try { const s=localStorage.getItem(getSaveKey()); if(s) Object.assign(state,JSON.parse(s)); } catch(e){} }
+function getPlayerName() { return currentPlayerName; }
+function setPlayerName(n) { currentPlayerName = (n || '').trim(); }
+function cloudReady() { return typeof FarmCloud !== 'undefined' && FarmCloud.uid && FarmCloud.uid(); }
+
+function formatSaveClock(ts) {
+  const d = new Date(ts);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+function renderSaveStatus() {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  const manual = lastSavedAt && Date.now() < manualFlashUntil;
+  let text = '尚未同步';
+  if (syncError) text = '同步失敗';
+  else if (saveFlight) text = '同步中…';
+  else if (manual) text = `已存檔 ${formatSaveClock(lastSavedAt)}`;
+  else if (lastSavedAt) text = `已同步 · 上次存檔 ${formatSaveClock(lastSavedAt)}`;
+  el.textContent = text;
+  el.classList.toggle('just-saved', !!manual && !syncError);
+  el.classList.toggle('is-error', !!syncError);
+  el.setAttribute('aria-label', text);
+}
+
+function saveState(kind = 'auto') {
+  if (!cloudReady() || !getPlayerName()) return false;
+  if (kind === 'manual' || kind === 'now') {
+    clearTimeout(saveDebounce);
+    saveDebounce = null;
+    flushSave(kind);
+    return true;
+  }
+  if (!saveDebounce) saveDebounce = setTimeout(() => { saveDebounce = null; flushSave('auto'); }, 1500);
+  return true;
+}
+
+function flushSave(kind) {
+  if (!cloudReady() || !getPlayerName()) return;
+  if (saveFlight) { saveQueued = kind; return; }
+  const snapshot = JSON.parse(JSON.stringify(state));
+  const name = getPlayerName();
+  syncError = false;
+  renderSaveStatus();
+  saveFlight = FarmCloud.saveMine(snapshot, name).then((savedAt) => {
+    lastSavedAt = savedAt || Date.now();
+    syncError = false;
+    if (kind === 'manual') {
+      manualFlashUntil = Date.now() + 4000;
+      clearTimeout(saveStatusTimer);
+      saveStatusTimer = setTimeout(renderSaveStatus, 4100);
+    }
+  }).catch(() => { syncError = true; }).finally(() => {
+    const again = saveQueued;
+    saveQueued = false;
+    saveFlight = null;
+    renderSaveStatus();
+    renderLeaderboard();
+    if (again) flushSave(again === 'manual' ? 'manual' : 'auto');
+  });
+}
 function unlockedPlotCount() { return PLOTS_UNLOCKED[Math.min(state.level-1,PLOTS_UNLOCKED.length-1)]; }
 function expToNextLevel()    { return LEVEL_EXP[Math.min(state.level,LEVEL_EXP.length-1)]; }
 function addLog(msg) {
@@ -232,46 +296,46 @@ function renderPlayer() {
   if (!btn) return;
   const name = getPlayerName();
   btn.textContent = name ? `👤 ${name}` : '👤 ?';
-  btn.setAttribute('aria-label', name ? `目前玩家 ${name}，切換玩家` : '設定玩家名稱');
+  btn.setAttribute('aria-label', name ? `目前玩家 ${name}，更改顯示名稱` : '設定顯示名稱');
+  const adminLink = document.getElementById('admin-link');
+  if (adminLink && typeof FarmCloud !== 'undefined') adminLink.hidden = !FarmCloud.isAdmin();
 }
 
+let boardToken = 0;
 function renderLeaderboard() {
   const el = document.getElementById('leaderboard-list');
   if (!el) return;
-  const players = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key.startsWith('happyFarm_save_')) continue;
-    try {
-      const d = JSON.parse(localStorage.getItem(key));
-      const lv = d.level || 1, coins = d.coins || 0;
-      players.push({ name: key.replace('happyFarm_save_', ''), level: lv, coins, score: lv * 10000 + coins });
-    } catch(e) {}
-  }
-  players.sort((a, b) => b.score - a.score);
-  const medals = ['🥇','🥈','🥉'];
-  const me = getPlayerName();
-  el.innerHTML = '';
-  if (!players.length) { el.innerHTML = '<li class="lb-empty">尚無記錄</li>'; return; }
-  players.slice(0, 10).forEach((p, i) => {
-    const li = document.createElement('li');
-    li.className = 'lb-item' + (p.name === me ? ' lb-me' : '');
-    if (p.name === me) li.setAttribute('aria-current', 'true');
-    const rank = document.createElement('span');
-    rank.className = 'lb-rank';
-    rank.textContent = medals[i] || String(i + 1);
-    const nameEl = document.createElement('span');
-    nameEl.className = 'lb-name';
-    nameEl.textContent = p.name;
-    const score = document.createElement('span');
-    score.className = 'lb-score';
-    score.textContent = `Lv${p.level} 🪙${p.coins.toLocaleString()}`;
-    li.append(rank, nameEl, score);
-    el.appendChild(li);
-  });
+  const token = ++boardToken;
+  const paint = (players) => {
+    if (token !== boardToken) return;
+    players.sort((a, b) => (b.level * 10000 + b.coins) - (a.level * 10000 + a.coins));
+    const medals = ['🥇','🥈','🥉'];
+    const me = cloudReady() ? FarmCloud.uid() : '';
+    el.innerHTML = '';
+    if (!players.length) { el.innerHTML = '<li class="lb-empty">尚無記錄</li>'; return; }
+    players.slice(0, 10).forEach((p, i) => {
+      const mine = p.uid === me;
+      const li = document.createElement('li');
+      li.className = 'lb-item' + (mine ? ' lb-me' : '');
+      if (mine) li.setAttribute('aria-current', 'true');
+      const rank = document.createElement('span');
+      rank.className = 'lb-rank';
+      rank.textContent = medals[i] || String(i + 1);
+      const nameEl = document.createElement('span');
+      nameEl.className = 'lb-name';
+      nameEl.textContent = p.displayName;
+      const score = document.createElement('span');
+      score.className = 'lb-score';
+      score.textContent = `Lv${p.level} 🪙${p.coins.toLocaleString()}`;
+      li.append(rank, nameEl, score);
+      el.appendChild(li);
+    });
+  };
+  if (!cloudReady()) { paint([]); return; }
+  FarmCloud.leaderboard().then(paint).catch(() => paint([]));
 }
 
-function render() { renderStats(); renderSeedShop(); renderFarm(); renderInventory(); renderWeather(); renderPlayer(); renderLeaderboard(); }
+function render() { renderStats(); renderSeedShop(); renderFarm(); renderInventory(); renderWeather(); renderPlayer(); renderLeaderboard(); renderSaveStatus(); }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 function selectSeed(key) {
@@ -317,7 +381,10 @@ function handlePlotClick(idx) {
   switch(state.selectedTool) {
     case 'plant':     fb = doPlant(plot);     break;
     case 'water':     fb = doWater(plot);     break;
-    case 'harvest':   fb = doHarvest(plot);   break;
+    case 'harvest':
+      if (plot.status === 'ready') fb = harvestReadyPlots(idx);
+      else doHarvest(plot);
+      break;
     case 'remove':    fb = doRemove(plot);    break;
     case 'fertilize': fb = doFertilize(plot); break;
   }
@@ -370,13 +437,45 @@ function doWater(plot) {
 function doHarvest(plot) {
   if (plot.status==='dead')    { addLog('⚠️ 植物已枯死，請改用清除工具'); return; }
   if (plot.status!=='ready')   { addLog(plot.cropKey?'⏳ 作物還沒成熟，請耐心等待':'⚠️ 這裡沒有作物可收穫'); return; }
-  const crop=CROPS[plot.cropKey];
-  state.inventory[plot.cropKey]=(state.inventory[plot.cropKey]||0)+1;
-  gainExp(crop.expGain);
-  addLog(`🌾 收穫了 ${crop.emoji} ${crop.name}！獲得 ${crop.expGain} 經驗`);
-  AudioManager.sfxHarvest();
-  resetPlot(plot);
-  return { kind:'harvest', text:'🌾 收穫' };
+  return harvestReadyPlots();
+}
+
+function showHarvestSummary(text) {
+  const el = document.getElementById('harvest-summary');
+  if (el) el.textContent = text;
+}
+
+function harvestReadyPlots() {
+  const ready = state.plots.filter((plot) => plot.status === 'ready' && plot.cropKey && CROPS[plot.cropKey]);
+  if (!ready.length) {
+    addLog('🌾 現在沒有可以收穫的作物。');
+    showHarvestSummary('現在沒有可以收穫的作物。');
+    return null;
+  }
+  const beforeCoins = state.coins;
+  const beforeLevel = state.level;
+  const counts = {};
+  let expGained = 0;
+  for (const plot of ready) {
+    const crop = CROPS[plot.cropKey];
+    counts[plot.cropKey] = (counts[plot.cropKey] || 0) + 1;
+    state.inventory[plot.cropKey] = (state.inventory[plot.cropKey] || 0) + 1;
+    expGained += crop.expGain;
+    gainExp(crop.expGain, true);
+    resetPlot(plot);
+  }
+  const detail = Object.entries(counts).map(([key, count]) => `${CROPS[key].emoji}${CROPS[key].name} x${count}`).join('、');
+  const coinDelta = state.coins - beforeCoins;
+  let msg = `🌾 收穫 ${ready.length} 塊（${detail}），+${expGained} 經驗`;
+  if (coinDelta > 0) msg += `，+${coinDelta} 金幣`;
+  addLog(msg);
+  showHarvestSummary(msg.replace(/^🌾\s*/, ''));
+  if (typeof AudioManager !== 'undefined' && AudioManager.sfxHarvest) AudioManager.sfxHarvest();
+  if (state.level > beforeLevel) {
+    if (typeof AudioManager !== 'undefined' && AudioManager.sfxLevelUp) AudioManager.sfxLevelUp();
+    showModal('🎉 升級了！', `恭喜升到 ⭐ 等級 ${state.level}！\n獲得 🪙${coinDelta} 金幣獎勵。\n${msg.replace(/^🌾\s*/, '')}`);
+  }
+  return { kind: 'harvest', text: `🌾 ${ready.length} 塊` };
 }
 
 function doRemove(plot) {
@@ -421,17 +520,21 @@ function resetPlot(plot) {
   Object.assign(plot,{status:'empty',cropKey:null,plantedAt:null,readyAt:null,watered:false,lastWateredAt:null,wiltStartAt:null,fertilized:false,fertCount:0,overWatered:false,deathCause:null});
 }
 
-function gainExp(amount) {
+function gainExp(amount, quiet) {
   state.exp = Math.min(state.exp + amount, MAX_VAL);
   const needed=expToNextLevel();
+  let bonus = 0;
   if (state.exp>=needed && state.level<LEVEL_EXP.length-1) {
     state.exp-=needed; state.level+=1;
-    const bonus = Math.min(state.level * 500, MAX_VAL);
+    bonus = Math.min(state.level * 500, MAX_VAL);
     state.coins = Math.min(state.coins + bonus, MAX_VAL);
-    addLog(`⭐ 升級！達到等級 ${state.level}，獲得 🪙${bonus} 金幣`);
-    AudioManager.sfxLevelUp();
-    showModal(`🎉 升級了！`,`恭喜升到 ⭐ 等級 ${state.level}！\n解鎖了更多農地，並獲得 🪙${bonus} 金幣獎勵！`);
+    if (!quiet) {
+      addLog(`⭐ 升級！達到等級 ${state.level}，獲得 🪙${bonus} 金幣`);
+      AudioManager.sfxLevelUp();
+      showModal(`🎉 升級了！`,`恭喜升到 ⭐ 等級 ${state.level}！\n解鎖了更多農地，並獲得 🪙${bonus} 金幣獎勵！`);
+    }
   }
+  return { bonus };
 }
 
 function sellAll() {
@@ -528,12 +631,12 @@ function growTick() {
 
 // ── Reset Game ────────────────────────────────────────────────────────────────
 function resetGame() {
-  localStorage.removeItem(getSaveKey());
   Object.assign(state,{coins:100,exp:0,level:1,selectedSeed:'radish',selectedTool:'plant',plots:defaultPlots(),log:[],weather:'sunny',weatherNextAt:now()+60000,lastAutoWaterAt:0});
   Object.keys(CROPS).forEach(k=>{state.inventory[k]=0;});
   selectTool('plant');
   render();
   addLog('🌾 新遊戲開始！選種子開始你的農場之旅！');
+  saveState('manual');
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
@@ -583,36 +686,146 @@ function closeModal() {
 }
 
 // ── Player modal ──────────────────────────────────────────────────────────────
-function showPlayerModal(required = false) {
-  const current = getPlayerName();
-  const title = required ? '👋 歡迎來到開心農場！' : '🔄 切換玩家';
-  const body  = required
-    ? '請輸入你的名稱來儲存進度：'
-    : `目前玩家：${current}\n輸入名稱切換（或建立新玩家）：`;
-  showModal(title, body, {
+function showPlayerModal() {
+  showModal('👤 顯示名稱', `目前名稱：${getPlayerName()}\n改名後，雲端和前十名會一起更新。`, {
     input: true,
-    inputValue: required ? '' : '',
-    placeholder: '輸入名稱（最多12字）',
-    confirmText: '開始遊戲',
+    inputValue: getPlayerName(),
+    placeholder: '最多 12 字',
+    confirmText: '儲存名稱',
     closeText: '取消',
-    hideClose: required,
     onConfirm: (raw) => {
       const name = raw.trim();
-      if (!name) { showPlayerModal(required); return; }
-      saveState();                   // save current player before switching
+      if (!name || name.length > 12) { showModal('名稱不正確', '請輸入 1 到 12 個字。'); return; }
       setPlayerName(name);
-      // reset state then load this player's save
-      Object.assign(state,{coins:100,exp:0,level:1,selectedSeed:'radish',selectedTool:'plant',
-        plots:defaultPlots(),log:[],weather:'sunny',weatherNextAt:now()+60000,lastAutoWaterAt:0});
-      Object.keys(CROPS).forEach(k=>{state.inventory[k]=0;});
-      state.plots.forEach(p=>{ p.fertCount=0; p.overWatered=false; p.deathCause=null; });
-      loadState();
-      selectTool(state.selectedTool || 'plant');
-      render();
-      addLog(`🌾 歡迎，${name}！繼續你的農場之旅！`);
-      maybeShowTutorial();
+      renderPlayer();
+      saveState('manual');
     },
   });
+}
+
+function freshProgress() {
+  const next = { coins:100, exp:0, level:1, selectedSeed:'radish', selectedTool:'plant', plots:defaultPlots(), inventory:{}, log:[], weather:'sunny', weatherNextAt:now()+60000, lastAutoWaterAt:0 };
+  Object.keys(CROPS).forEach((key) => { next.inventory[key] = 0; });
+  return next;
+}
+
+function normalizeLoaded(progress) {
+  Object.assign(state, freshProgress(), progress || {});
+  if (!state.plots || state.plots.length !== TOTAL_PLOTS) state.plots = defaultPlots();
+  state.plots.forEach((plot) => {
+    if (plot.lastWateredAt === undefined) plot.lastWateredAt = null;
+    if (plot.wiltStartAt === undefined) plot.wiltStartAt = null;
+    if (plot.fertilized === undefined) plot.fertilized = false;
+    if (plot.fertCount === undefined) plot.fertCount = plot.fertilized ? 1 : 0;
+    if (plot.overWatered === undefined) plot.overWatered = false;
+    if (plot.deathCause === undefined) plot.deathCause = null;
+  });
+  if (!state.inventory || typeof state.inventory !== 'object') state.inventory = {};
+  Object.keys(CROPS).forEach((key) => { if (state.inventory[key] === undefined) state.inventory[key] = 0; });
+  if (!state.weather || !WEATHERS[state.weather]) state.weather = 'sunny';
+  if (!state.weatherNextAt) state.weatherNextAt = now() + 60000;
+  if (state.lastAutoWaterAt === undefined) state.lastAutoWaterAt = 0;
+  if (!['plant', 'water', 'harvest', 'fertilize', 'remove'].includes(state.selectedTool)) state.selectedTool = 'plant';
+  if (!state.selectedSeed || !CROPS[state.selectedSeed]) state.selectedSeed = 'radish';
+}
+
+function findLocalSave(name) {
+  try {
+    const key = `happyFarm_save_${name}`;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    const record = data && data.format === 'happyFarm' && data.state ? data.state : data;
+    if (!record || typeof record.coins !== 'number' || !Array.isArray(record.plots)) return null;
+    return { key, record };
+  } catch (error) { return null; }
+}
+
+function stopLoops() {
+  loopsStarted = false;
+  clearInterval(growTimer);
+  clearInterval(cloudTimer);
+}
+
+let growTimer = null;
+let cloudTimer = null;
+function startLoops() {
+  if (loopsStarted) return;
+  loopsStarted = true;
+  growTimer = setInterval(growTick, 1000);
+  cloudTimer = setInterval(() => saveState('auto'), 10000);
+}
+
+function showLoggedOut() {
+  stopLoops();
+  currentPlayerName = '';
+  lastSavedAt = 0;
+  document.body.classList.add('logged-out');
+  document.body.classList.remove('logged-in');
+  const app = document.getElementById('app');
+  const login = document.getElementById('login-screen');
+  if (app) app.hidden = true;
+  if (login) login.hidden = false;
+  const form = document.getElementById('login-form');
+  const setup = document.getElementById('login-setup');
+  if (form) form.hidden = false;
+  if (setup) setup.hidden = true;
+}
+
+function showFarm() {
+  document.body.classList.remove('logged-out');
+  document.body.classList.add('logged-in');
+  const app = document.getElementById('app');
+  const login = document.getElementById('login-screen');
+  if (login) login.hidden = true;
+  if (app) app.hidden = false;
+}
+
+function beginGame(profile) {
+  setPlayerName(profile.displayName);
+  normalizeLoaded(profile.progress);
+  lastSavedAt = profile.savedAt || 0;
+  syncError = false;
+  showFarm();
+  selectTool(state.selectedTool || 'plant');
+  syncAudioButtons();
+  render();
+  startLoops();
+  if (!profile.savedAt) addLog(`🌾 歡迎，${getPlayerName()}！`);
+  maybeShowTutorial();
+  if (!profile.savedAt) saveState('manual');
+}
+
+function refreshImportOffer() {
+  const name = document.getElementById('display-name').value.trim();
+  const found = name ? findLocalSave(name) : null;
+  const line = document.getElementById('import-line');
+  const note = document.getElementById('import-note');
+  if (line) line.hidden = !found;
+  if (note) note.textContent = found ? `這台電腦有「${name}」的舊進度（等級 ${found.record.level || 1}、金幣 ${found.record.coins}）。` : '';
+}
+
+let settingUp = false;
+async function onSignedIn(user) {
+  if (settingUp) return;
+  const error = document.getElementById('login-error');
+  if (error) error.textContent = '';
+  try {
+    const mine = await FarmCloud.loadMine();
+    if (!cloudReady() || FarmCloud.uid() !== user.uid) return;
+    if (mine && mine.displayName) { beginGame(mine); return; }
+    settingUp = true;
+    document.getElementById('login-form').hidden = true;
+    document.getElementById('login-setup').hidden = false;
+    const suggested = (user.loginName || '').slice(0, 12);
+    document.getElementById('display-name').value = suggested;
+    document.getElementById('setup-error').textContent = '';
+    refreshImportOffer();
+    document.getElementById('display-name').focus();
+  } catch (err) {
+    if (error) error.textContent = FarmCloudError(err);
+    showLoggedOut();
+  }
 }
 
 // ── First-visit tutorial ──────────────────────────────────────────────────────
@@ -728,21 +941,6 @@ function trapFocus(container, event) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 function init() {
-  loadState();
-  if (!state.plots||state.plots.length!==TOTAL_PLOTS) state.plots=defaultPlots();
-  state.plots.forEach(plot => {
-    if (plot.lastWateredAt===undefined) plot.lastWateredAt=null;
-    if (plot.wiltStartAt===undefined)   plot.wiltStartAt=null;
-    if (plot.fertilized===undefined)    plot.fertilized=false;
-    if (plot.fertCount===undefined)     plot.fertCount = plot.fertilized ? 1 : 0;
-    if (plot.overWatered===undefined)   plot.overWatered=false;
-    if (plot.deathCause===undefined)    plot.deathCause=null;
-  });
-  Object.keys(CROPS).forEach(k=>{ if(state.inventory[k]===undefined) state.inventory[k]=0; });
-  if (!state.weather)                    state.weather = 'sunny';
-  if (!state.weatherNextAt)              state.weatherNextAt = now() + 60000;
-  if (state.lastAutoWaterAt===undefined) state.lastAutoWaterAt = 0;
-
   document.querySelectorAll('.tool-btn').forEach(btn=>btn.addEventListener('click',()=>selectTool(btn.dataset.tool)));
   document.getElementById('sell-all-btn').addEventListener('click', sellAll);
   document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -753,7 +951,20 @@ function init() {
     closeModal();
   });
 
-  document.getElementById('player-btn').addEventListener('click', () => showPlayerModal(false));
+  document.getElementById('player-btn').addEventListener('click', () => showPlayerModal());
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    showModal('登出', '確定要登出嗎？下一位同學需要用自己的帳號登入。', {
+      confirmText: '登出',
+      closeText: '取消',
+      onConfirm: () => FarmCloud.signOut(),
+    });
+  });
+  document.getElementById('save-btn').addEventListener('click', () => saveState('manual'));
+  document.getElementById('harvest-all-btn').addEventListener('click', () => {
+    harvestReadyPlots();
+    saveState();
+    render();
+  });
   document.getElementById('pause-btn').addEventListener('click', togglePause);
   document.getElementById('help-btn').addEventListener('click', openTutorial);
   document.getElementById('tutorial-skip').addEventListener('click', closeTutorial);
@@ -818,18 +1029,56 @@ function init() {
     syncAudioButtons();
   });
 
-  selectTool(state.selectedTool || 'plant');
   syncAudioButtons();
-  render();
-  setInterval(growTick, 1000);
-  setInterval(saveState, 10000);
-
-  if (!getPlayerName()) {
-    showPlayerModal(true);   // 第一次進入：強制輸入名稱
-  } else {
-    addLog(`🌾 歡迎回來，${getPlayerName()}！繼續你的農場之旅！`);
-    maybeShowTutorial();
-  }
+  document.getElementById('google-login').addEventListener('click', async () => {
+    document.getElementById('login-error').textContent = '';
+    try { await FarmCloud.signInGoogle(); }
+    catch (error) { document.getElementById('login-error').textContent = FarmCloudError(error); }
+  });
+  document.getElementById('password-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    document.getElementById('login-error').textContent = '';
+    try {
+      await FarmCloud.signInPassword(
+        document.getElementById('login-username').value,
+        document.getElementById('login-password').value,
+      );
+    } catch (error) {
+      document.getElementById('login-error').textContent = FarmCloudError(error);
+    }
+  });
+  document.getElementById('display-name').addEventListener('input', refreshImportOffer);
+  document.getElementById('login-setup').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const error = document.getElementById('setup-error');
+    error.textContent = '';
+    const name = document.getElementById('display-name').value.trim();
+    if (!name || name.length > 12) { error.textContent = '請輸入 1 到 12 個字的名稱。'; return; }
+    const importing = !document.getElementById('import-line').hidden && document.getElementById('import-local').checked;
+    const local = importing ? findLocalSave(name) : null;
+    setPlayerName(name);
+    normalizeLoaded(local ? local.record : null);
+    try {
+      const savedAt = await FarmCloud.saveMine(state, name);
+      if (local) localStorage.removeItem(local.key);
+      settingUp = false;
+      beginGame({ displayName: name, progress: JSON.parse(JSON.stringify(state)), savedAt });
+    } catch (err) {
+      error.textContent = FarmCloudError(err);
+    }
+  });
+  document.getElementById('setup-cancel').addEventListener('click', async () => {
+    settingUp = false;
+    await FarmCloud.signOut();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') saveState('now');
+  });
+  showLoggedOut();
+  FarmCloud.start({
+    onSignedIn: onSignedIn,
+    onSignedOut: () => { settingUp = false; showLoggedOut(); },
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);
