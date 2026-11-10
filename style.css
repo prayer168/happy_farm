@@ -920,3 +920,8 @@ body[data-weather="storm"] #weather-fx {
 .save-manager-row span { min-width:0; overflow-wrap:anywhere; }
 .save-manager-row small { display:block; color:#43584b; }
 .save-manager-row button { flex-shrink:0; min-height:40px; padding:8px 12px; border:1px solid #a83232; border-radius:6px; color:#8d2525; background:#fff; cursor:pointer; }
+
+#admin-sign-out {
+  margin-top:14px; min-height:40px; padding:8px 12px; border:1px solid var(--green-mid);
+  border-radius:8px; color:var(--green-dark); background:white; font-weight:700; cursor:pointer;
+}

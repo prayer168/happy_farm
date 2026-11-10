@@ -586,6 +586,7 @@ function showModal(title, body, opts = {}) {
 
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
+  document.getElementById('modal-body').replaceChildren();
   document.getElementById('modal-input').classList.add('hidden');
   document.getElementById('modal-confirm').classList.add('hidden');
   const back = lastFocus;
@@ -593,7 +594,36 @@ function closeModal() {
   if (back && typeof back.focus === 'function' && document.contains(back)) back.focus();
 }
 
+function openSaveManager() {
+  const admin = window.farmAdminAuth;
+  if (admin?.isAdmin()) {
+    showSaveManager();
+    return;
+  }
+  if (!admin) {
+    showModal('管理員登入', '暫時無法載入 Google 登入，請重新整理後再試。');
+    return;
+  }
+  showModal('管理員登入', '請使用已授權的 Google 帳號登入，以管理本機玩家存檔。', {
+    confirmText: '使用 Google 登入',
+    closeText: '取消',
+    onConfirm: async () => {
+      const button = document.getElementById('manage-saves-btn');
+      button.disabled = true;
+      try {
+        if (await admin.signIn()) showSaveManager();
+        else showModal('帳號未獲授權', '請改用教材中心的管理員 Google 帳號登入。');
+      } catch {
+        showModal('登入未完成', '請允許 Google 登入彈出視窗，然後再試一次。');
+      } finally {
+        button.disabled = false;
+      }
+    }
+  });
+}
+
 function showSaveManager() {
+  if (!window.farmAdminAuth?.isAdmin()) return;
   saveState();
   showModal('本機後台管理', '這個瀏覽器的玩家存檔。刪除後無法復原。');
   const list = document.createElement('div');
@@ -622,6 +652,7 @@ function showSaveManager() {
         confirmText: '刪除玩家資料',
         closeText: '取消',
         onConfirm: () => {
+          if (!window.farmAdminAuth?.isAdmin()) return;
           try {
             const isCurrent = name === getPlayerName();
             localStorage.removeItem(key);
@@ -642,7 +673,19 @@ function showSaveManager() {
     list.appendChild(row);
   });
   if (!keys.length) list.textContent = '目前沒有玩家存檔。';
-  document.getElementById('modal-body').appendChild(list);
+  const logout = document.createElement('button');
+  logout.type = 'button';
+  logout.id = 'admin-sign-out';
+  logout.textContent = '登出 Google';
+  logout.addEventListener('click', async () => {
+    closeModal();
+    try {
+      await window.farmAdminAuth.signOut();
+    } catch {
+      showModal('登出未完成', '請重新整理頁面以結束這次管理員登入。');
+    }
+  });
+  document.getElementById('modal-body').append(list, logout);
 }
 
 // ── Player modal ──────────────────────────────────────────────────────────────
@@ -816,7 +859,7 @@ function init() {
     closeModal();
   });
 
-  document.getElementById('manage-saves-btn').addEventListener('click', showSaveManager);
+  document.getElementById('manage-saves-btn').addEventListener('click', openSaveManager);
   document.getElementById('save-btn').addEventListener('click', () => {
     if (!getPlayerName()) { showPlayerModal(true); return; }
     if (saveState()) addLog('進度已儲存在這個瀏覽器。');
