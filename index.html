@@ -6,7 +6,8 @@
   <title>開心農場</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-weather="sunny">
+  <a class="skip-link" href="#farm-grid">跳到農場</a>
   <div id="app">
 
     <!-- ── Header ── -->
@@ -16,60 +17,66 @@
         <span>🪙 <strong id="coins">100</strong></span>
         <span>⭐ Lv.<strong id="level">1</strong></span>
         <span>EXP <span id="exp">0</span>/<span id="exp-next">800</span></span>
-        <span id="weather-display">🌞 晴天</span>
+        <span id="weather-display" aria-live="polite">🌞 晴天</span>
         <span id="session-timer">⏱ 00:00</span>
       </div>
       <div id="header-btns">
-        <button id="player-btn" title="切換玩家">👤 ...</button>
-        <button id="pause-btn" title="暫停 / 繼續">⏸</button>
-        <button id="bg-toggle" title="背景音樂">🎵</button>
-        <button id="sfx-toggle" title="音效">🔊</button>
-        <button id="restart-btn" title="重新開始">🔄</button>
-        <button id="fullscreen-btn" title="全螢幕">⛶</button>
+        <button id="player-btn" type="button" title="切換玩家" aria-label="切換玩家">👤 ...</button>
+        <button id="pause-btn" type="button" title="暫停" aria-label="暫停遊戲" aria-pressed="false">⏸</button>
+        <div class="sound-group" role="group" aria-label="聲音">
+          <button id="bg-toggle" type="button" title="背景音樂" aria-pressed="false" aria-label="開啟背景音樂"><span aria-hidden="true">🎵</span><span class="btn-label">音樂關</span></button>
+          <button id="sfx-toggle" type="button" title="音效" aria-pressed="true" aria-label="關閉音效"><span aria-hidden="true">🔊</span><span class="btn-label">音效開</span></button>
+        </div>
+        <button id="help-btn" type="button" title="開啟教學" aria-label="開啟教學">❓ 教學</button>
+        <button id="restart-btn" type="button" title="重新開始遊戲" aria-label="重玩">🔄 重玩</button>
+        <button id="fullscreen-btn" type="button" title="全螢幕" aria-label="進入全螢幕" aria-pressed="false">⛶</button>
       </div>
     </header>
 
     <!-- ── Main: 左側工具 | 農場 | 右側種子+日誌 ── -->
-    <main>
+    <main aria-label="農場畫面">
 
-      <!-- 左側：工具 + 倉庫 -->
-      <aside id="left-panel">
-        <section id="tool-panel">
-          <h2>工具</h2>
-          <div id="tools">
-            <button class="tool-btn active" data-tool="plant">🌱 種植</button>
-            <button class="tool-btn" data-tool="water">💧 澆水</button>
-            <button class="tool-btn" data-tool="harvest">🌾 收穫</button>
-            <button class="tool-btn" data-tool="fertilize">⚗️ 施肥</button>
-            <button class="tool-btn" data-tool="remove">🗑️ 清除</button>
+      <!-- 左側：工具 + 倉庫 + 排行榜 -->
+      <aside id="left-panel" aria-label="工具、倉庫與排行榜">
+        <section id="tool-panel" aria-labelledby="tool-heading">
+          <h2 id="tool-heading">工具</h2>
+          <div id="tools" role="group" aria-label="農具">
+            <button class="tool-btn active" type="button" data-tool="plant" aria-pressed="true">🌱 種植</button>
+            <button class="tool-btn" type="button" data-tool="water" aria-pressed="false">💧 澆水</button>
+            <button class="tool-btn" type="button" data-tool="harvest" aria-pressed="false">🌾 收穫</button>
+            <button class="tool-btn" type="button" data-tool="fertilize" aria-pressed="false">⚗️ 施肥</button>
+            <button class="tool-btn" type="button" data-tool="remove" aria-pressed="false">🗑️ 清除</button>
           </div>
         </section>
-        <section id="inventory-panel">
-          <h2>倉庫</h2>
+        <section id="inventory-panel" aria-labelledby="inventory-heading">
+          <h2 id="inventory-heading">倉庫</h2>
           <div id="inventory"></div>
-          <button id="sell-all-btn">賣出全部 (獲得金幣)</button>
+          <button id="sell-all-btn" type="button">賣出全部 (獲得金幣)</button>
         </section>
 
-        <section id="leaderboard-panel">
-          <h2>🏆 前十名</h2>
+        <section id="leaderboard-panel" aria-labelledby="leaderboard-heading">
+          <h2 id="leaderboard-heading">🏆 前十名</h2>
           <ol id="leaderboard-list"></ol>
         </section>
       </aside>
 
       <!-- 中間：農場格 -->
-      <section id="farm-section">
+      <section id="farm-section" aria-label="農場">
+        <div id="farm-sky" aria-hidden="true"></div>
         <div id="farm-grid"></div>
+        <div id="weather-fx" aria-hidden="true"></div>
+        <div id="fx-layer" aria-hidden="true"></div>
         <div id="pause-overlay"><span>⏸ 遊戲暫停</span></div>
       </section>
 
       <!-- 右側：種子商店 + 日誌 -->
-      <aside id="right-panel">
-        <section id="seed-shop">
-          <h2>種子商店</h2>
+      <aside id="right-panel" aria-label="種子商店與日誌">
+        <section id="seed-shop" aria-labelledby="seed-heading">
+          <h2 id="seed-heading">種子商店</h2>
           <div id="seed-list"></div>
         </section>
-        <section id="log-panel">
-          <h2>農場日誌</h2>
+        <section id="log-panel" aria-labelledby="log-heading">
+          <h2 id="log-heading">農場日誌</h2>
           <ul id="log-list"></ul>
         </section>
       </aside>
@@ -78,20 +85,39 @@
 
   </div>
 
+  <div id="action-announcer" class="sr-only" aria-live="polite"></div>
+
   <!-- ── Modal ── -->
   <div id="modal-overlay" class="hidden">
-    <div id="modal">
+    <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <h3 id="modal-title"></h3>
       <div id="modal-body"></div>
-      <input id="modal-input" type="text" class="hidden" maxlength="12" autocomplete="off">
+      <input id="modal-input" type="text" class="hidden" maxlength="12" autocomplete="off" aria-label="玩家名稱">
       <div id="modal-actions">
-        <button id="modal-confirm" class="hidden">確認</button>
-        <button id="modal-close">關閉</button>
+        <button id="modal-confirm" class="hidden" type="button">確認</button>
+        <button id="modal-close" type="button">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── First-visit tutorial ── -->
+  <div id="tutorial-overlay" class="hidden">
+    <div id="tutorial" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+      <p id="tutorial-kicker">農場教學</p>
+      <h3 id="tutorial-title">歡迎來到開心農場</h3>
+      <p id="tutorial-body"></p>
+      <div id="tutorial-dots" aria-hidden="true"></div>
+      <p id="tutorial-count" class="tutorial-count"></p>
+      <div id="tutorial-actions">
+        <button id="tutorial-skip" type="button">跳過</button>
+        <button id="tutorial-prev" type="button">上一步</button>
+        <button id="tutorial-next" type="button">下一步</button>
       </div>
     </div>
   </div>
 
   <script src="audio.js"></script>
   <script src="game.js"></script>
+  <script src="https://prayer168.github.io/science-portal/assets/material-visit-count.js" data-material="https://prayer168.github.io/happy_farm/" defer></script>
 </body>
 </html>

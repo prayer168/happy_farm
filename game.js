@@ -59,10 +59,14 @@ function updateTimer() {
 function togglePause() {
   isPaused = !isPaused;
   const btn = document.getElementById('pause-btn');
-  if (btn) { btn.textContent = isPaused ? '▶️' : '⏸'; btn.classList.toggle('active', isPaused); }
+  if (btn) {
+    btn.textContent = isPaused ? '▶️' : '⏸';
+    btn.setAttribute('aria-pressed', String(isPaused));
+    btn.setAttribute('aria-label', isPaused ? '繼續遊戲' : '暫停遊戲');
+    btn.title = isPaused ? '繼續' : '暫停';
+  }
   document.getElementById('pause-overlay')?.classList.toggle('visible', isPaused);
-  if (isPaused) AudioManager.toggleBg && AudioManager.isBgOn() && AudioManager.toggleBg();
-  else          AudioManager.toggleBg && !AudioManager.isBgOn() && AudioManager.toggleBg();
+  if (AudioManager.setBgSuspended) AudioManager.setBgSuspended(isPaused);
 }
 
 // ── Player management ────────────────────────────────────────────────────────
@@ -75,7 +79,13 @@ function saveState()  { if (!getPlayerName()) return; localStorage.setItem(getSa
 function loadState()  { try { const s=localStorage.getItem(getSaveKey()); if(s) Object.assign(state,JSON.parse(s)); } catch(e){} }
 function unlockedPlotCount() { return PLOTS_UNLOCKED[Math.min(state.level-1,PLOTS_UNLOCKED.length-1)]; }
 function expToNextLevel()    { return LEVEL_EXP[Math.min(state.level,LEVEL_EXP.length-1)]; }
-function addLog(msg) { state.log.unshift(msg); if(state.log.length>30) state.log.pop(); renderLog(); }
+function addLog(msg) {
+  state.log.unshift(msg);
+  if (state.log.length>30) state.log.pop();
+  renderLog();
+  const ann = document.getElementById('action-announcer');
+  if (ann) ann.textContent = msg;
+}
 function now() { return Date.now(); }
 function effectiveWaterInterval(cropKey) {
   return CROPS[cropKey].waterInterval * (WEATHERS[state.weather]?.waterMult ?? 1.0) * 1000;
@@ -94,10 +104,25 @@ function renderSeedShop() {
   list.innerHTML = '';
   for (const [key,crop] of Object.entries(CROPS)) {
     const locked = crop.unlockLevel > state.level;
+    const selected = state.selectedSeed===key && !locked;
     const card = document.createElement('div');
-    card.className = 'seed-card'+(locked?' locked-seed':'')+(state.selectedSeed===key&&!locked?' selected':'');
-    card.innerHTML = `<span class="seed-emoji">${crop.emoji}</span><span class="seed-name">${locked?`🔒 等級${crop.unlockLevel}解鎖`:crop.name}</span><span class="seed-cost">🪙${crop.seedCost}</span>`;
-    if (!locked) card.addEventListener('click', ()=>selectSeed(key));
+    card.className = 'seed-card'+(locked?' locked-seed':'')+(selected?' selected':'');
+    card.dataset.seed = key;
+    card.setAttribute('role', 'button');
+    card.tabIndex = locked ? -1 : 0;
+    card.setAttribute('aria-disabled', locked ? 'true' : 'false');
+    card.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    card.setAttribute('aria-label', locked
+      ? `${crop.name}，等級 ${crop.unlockLevel} 解鎖，種子 ${crop.seedCost} 金幣`
+      : `${crop.name}，種子 ${crop.seedCost} 金幣${selected ? '，已選取' : ''}`);
+    card.innerHTML = `<span class="seed-emoji" aria-hidden="true">${crop.emoji}</span><span class="seed-name">${locked?`🔒 等級${crop.unlockLevel}解鎖`:crop.name}</span><span class="seed-cost">🪙${crop.seedCost}</span>`;
+    if (!locked) {
+      const choose = () => selectSeed(key);
+      card.addEventListener('click', choose);
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); }
+      });
+    }
     list.appendChild(card);
   }
 }
@@ -137,8 +162,23 @@ function renderFarm() {
     }
     const fc = plot.fertCount || 0;
     const fertBadge=(fc>0&&!['ready','empty','locked'].includes(plot.status))? `<span class="plot-fertilized-badge">⚗️${fc>1?'×'+fc:''}</span>`:'';
-    div.innerHTML=`${fertBadge}<span class="plot-emoji">${emoji}</span><span class="plot-label">${label}</span>${progressHTML}`;
+    div.innerHTML=`${fertBadge}<span class="plot-emoji" aria-hidden="true">${emoji}</span><span class="plot-label">${label}</span>${progressHTML}`;
+    const toolNames = { plant:'種植', water:'澆水', harvest:'收穫', fertilize:'施肥', remove:'清除' };
+    let progressNote = '';
+    if (plot.cropKey && !['ready','empty','locked','dead','wilting'].includes(plot.status)) {
+      progressNote = `，生長 ${growProgress(plot)}%`;
+    }
+    div.setAttribute('role', 'button');
+    div.tabIndex = plot.status === 'locked' ? -1 : 0;
+    div.setAttribute('aria-disabled', plot.status === 'locked' ? 'true' : 'false');
+    div.setAttribute('aria-label', `第 ${i + 1} 格，${label}${progressNote}。目前工具：${toolNames[state.selectedTool] || ''}`);
+    const fx = plotFx.get(i);
+    if (fx && fx.until > Date.now()) div.classList.add('fx', 'fx-' + fx.kind);
+    else plotFx.delete(i);
     div.addEventListener('click',()=>handlePlotClick(i));
+    div.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePlotClick(i); }
+    });
     grid.appendChild(div);
   });
 }
@@ -160,7 +200,7 @@ function renderInventory() {
     item.innerHTML=`<span class="inv-emoji">${crop.emoji}</span><span class="inv-count">x${count}</span><span class="inv-value">🪙${crop.sellPrice}</span>`;
     inv.appendChild(item);
   }
-  if (!hasItems) inv.innerHTML='<span style="font-size:.78rem;color:#888">倉庫空空如也</span>';
+  if (!hasItems) inv.innerHTML='<span class="inv-empty">倉庫空空如也</span>';
 }
 
 function renderLog() {
@@ -172,9 +212,19 @@ function renderLog() {
 function renderWeather() {
   const w = WEATHERS[state.weather] || WEATHERS.sunny;
   const el = document.getElementById('weather-display');
+  document.body.dataset.weather = state.weather || 'sunny';
   if (!el) return;
+  const hints = {
+    sunny: '晴天，作物照常生長',
+    cloudy: '多雲，澆水間隔稍長',
+    rainy: '下雨，作物會自動澆到水',
+    drought: '乾旱，作物更快缺水',
+    storm: '暴風雨，作物可能受損',
+  };
   el.textContent = `${w.emoji} ${w.name}`;
   el.className = `weather-${state.weather}`;
+  el.title = hints[state.weather] || w.name;
+  el.setAttribute('aria-label', `目前天氣：${w.name}。${hints[state.weather] || ''}`);
 }
 
 function renderPlayer() {
@@ -182,6 +232,7 @@ function renderPlayer() {
   if (!btn) return;
   const name = getPlayerName();
   btn.textContent = name ? `👤 ${name}` : '👤 ?';
+  btn.setAttribute('aria-label', name ? `目前玩家 ${name}，切換玩家` : '設定玩家名稱');
 }
 
 function renderLeaderboard() {
@@ -205,7 +256,17 @@ function renderLeaderboard() {
   players.slice(0, 10).forEach((p, i) => {
     const li = document.createElement('li');
     li.className = 'lb-item' + (p.name === me ? ' lb-me' : '');
-    li.innerHTML = `<span class="lb-rank">${medals[i] || (i+1)}</span><span class="lb-name">${p.name}</span><span class="lb-score">Lv${p.level} 🪙${p.coins.toLocaleString()}</span>`;
+    if (p.name === me) li.setAttribute('aria-current', 'true');
+    const rank = document.createElement('span');
+    rank.className = 'lb-rank';
+    rank.textContent = medals[i] || String(i + 1);
+    const nameEl = document.createElement('span');
+    nameEl.className = 'lb-name';
+    nameEl.textContent = p.name;
+    const score = document.createElement('span');
+    score.className = 'lb-score';
+    score.textContent = `Lv${p.level} 🪙${p.coins.toLocaleString()}`;
+    li.append(rank, nameEl, score);
     el.appendChild(li);
   });
 }
@@ -213,23 +274,55 @@ function renderLeaderboard() {
 function render() { renderStats(); renderSeedShop(); renderFarm(); renderInventory(); renderWeather(); renderPlayer(); renderLeaderboard(); }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
-function selectSeed(key) { state.selectedSeed=key; renderSeedShop(); }
+function selectSeed(key) {
+  state.selectedSeed=key;
+  renderSeedShop();
+  document.querySelector(`.seed-card[data-seed="${key}"]`)?.focus();
+}
 function selectTool(tool) {
   state.selectedTool=tool;
-  document.querySelectorAll('.tool-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.tool===tool));
+  document.querySelectorAll('.tool-btn').forEach(btn => {
+    const on = btn.dataset.tool===tool;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
+const plotFx = new Map();
+
+function showActionFeedback(idx, fb) {
+  if (!fb) return;
+  plotFx.set(idx, { kind: fb.kind, until: Date.now() + 880 });
+  const plotEl = document.querySelector(`#farm-grid .plot[data-id="${idx}"]`);
+  if (plotEl) plotEl.classList.add('fx', 'fx-' + fb.kind);
+  const layer = document.getElementById('fx-layer');
+  const section = document.getElementById('farm-section');
+  if (!plotEl || !layer || !section) return;
+  const pr = plotEl.getBoundingClientRect();
+  const sr = section.getBoundingClientRect();
+  const el = document.createElement('span');
+  el.className = 'action-floater fx-' + fb.kind;
+  el.textContent = fb.text;
+  el.style.left = (pr.left - sr.left + pr.width / 2) + 'px';
+  el.style.top = (pr.top - sr.top + pr.height * 0.16) + 'px';
+  layer.appendChild(el);
+  setTimeout(() => el.remove(), 900);
 }
 
 function handlePlotClick(idx) {
+  if (isPaused) { addLog('⏸ 遊戲暫停中'); return; }
   const plot=state.plots[idx];
   if (plot.status==='locked') { showModal('🔒 尚未解鎖','升級以解鎖更多農地！'); return; }
+  let fb = null;
   switch(state.selectedTool) {
-    case 'plant':     doPlant(plot);     break;
-    case 'water':     doWater(plot);     break;
-    case 'harvest':   doHarvest(plot);   break;
-    case 'remove':    doRemove(plot);    break;
-    case 'fertilize': doFertilize(plot); break;
+    case 'plant':     fb = doPlant(plot);     break;
+    case 'water':     fb = doWater(plot);     break;
+    case 'harvest':   fb = doHarvest(plot);   break;
+    case 'remove':    fb = doRemove(plot);    break;
+    case 'fertilize': fb = doFertilize(plot); break;
   }
   saveState(); render();
+  if (fb) showActionFeedback(idx, fb);
 }
 
 function doPlant(plot) {
@@ -243,6 +336,7 @@ function doPlant(plot) {
   Object.assign(plot,{status:'planted',cropKey,plantedAt:t,readyAt:t+crop.growTime*1000,watered:false,lastWateredAt:t,wiltStartAt:null,fertilized:false,fertCount:0,overWatered:false,deathCause:null});
   addLog(`🌱 種下了 ${crop.name}，記得每 ${crop.waterInterval} 秒澆水！`);
   AudioManager.sfxPlant();
+  return { kind:'plant', text:'🌱 種下' };
 }
 
 function doWater(plot) {
@@ -257,11 +351,12 @@ function doWater(plot) {
       if (plot.overWatered) {
         plot.status='dead'; plot.deathCause='overwater';
         addLog(`🫧 ${crop.emoji} ${crop.name} 溺斃了！根部腐爛，澆水過多所致！`);
-        AudioManager.sfxDead(); saveState(); render(); return;
+        AudioManager.sfxDead();
+        return { kind:'water', text:'🫧 太多水' };
       }
       plot.overWatered=true;
       addLog(`⚠️ ${crop.name} 水分已足夠！再澆水植物會溺斃！`);
-      saveState(); render(); return;
+      return { kind:'water', text:'💧 夠了' };
     }
   }
   plot.lastWateredAt=t; plot.watered=true; plot.wiltStartAt=null; plot.overWatered=false;
@@ -269,6 +364,7 @@ function doWater(plot) {
   if (wasWilting) { plot.status=growProgress(plot)>40?'growing':'planted'; addLog(`💧 澆水！${crop.name} 從枯萎中恢復，繼續生長`); }
   else            { plot.status='watered'; addLog(`💧 澆水！${crop.name} 加速成長 ${crop.waterBonus} 秒`); }
   AudioManager.sfxWater();
+  return { kind:'water', text:'💧 澆水' };
 }
 
 function doHarvest(plot) {
@@ -280,6 +376,7 @@ function doHarvest(plot) {
   addLog(`🌾 收穫了 ${crop.emoji} ${crop.name}！獲得 ${crop.expGain} 經驗`);
   AudioManager.sfxHarvest();
   resetPlot(plot);
+  return { kind:'harvest', text:'🌾 收穫' };
 }
 
 function doRemove(plot) {
@@ -287,6 +384,7 @@ function doRemove(plot) {
   addLog(plot.cropKey?`🗑️ 清除了 ${CROPS[plot.cropKey].name}`:'🗑️ 清除了枯死的植物');
   AudioManager.sfxRemove();
   resetPlot(plot);
+  return { kind:'clear', text:'🗑️ 清除' };
 }
 
 function doFertilize(plot) {
@@ -303,7 +401,8 @@ function doFertilize(plot) {
     state.coins -= cost;
     plot.status='dead'; plot.deathCause='overfertilize';
     addLog(`☠️ 施肥過量！${crop.emoji} ${crop.name} 肥料中毒死亡！（第3次施肥）`);
-    AudioManager.sfxDead(); saveState(); render(); return;
+    AudioManager.sfxDead();
+    return { kind:'fertilize', text:'☠️ 過量' };
   }
   const cost = Math.floor(crop.fertilizerCost * (fc === 0 ? 1 : 2));
   if (state.coins < cost) { showModal('金幣不足',`施肥 ${crop.name} 需要 🪙${cost}，你只有 🪙${state.coins}。`); return; }
@@ -315,6 +414,7 @@ function doFertilize(plot) {
   plot.fertilized = true;
   addLog(`⚗️ 施肥（第${plot.fertCount}次）！${crop.name} 縮短 ${Math.round(reduction*100)}% 時間，🪙${cost}${fc===1?' ⚠️ 再施肥一次會中毒！':''}`);
   AudioManager.sfxFertilize();
+  return { kind:'fertilize', text:'⚗️ 施肥' };
 }
 
 function resetPlot(plot) {
@@ -431,13 +531,17 @@ function resetGame() {
   localStorage.removeItem(getSaveKey());
   Object.assign(state,{coins:100,exp:0,level:1,selectedSeed:'radish',selectedTool:'plant',plots:defaultPlots(),log:[],weather:'sunny',weatherNextAt:now()+60000,lastAutoWaterAt:0});
   Object.keys(CROPS).forEach(k=>{state.inventory[k]=0;});
-  document.querySelectorAll('.tool-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.tool==='plant'));
+  selectTool('plant');
   render();
   addLog('🌾 新遊戲開始！選種子開始你的農場之旅！');
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
+let lastFocus = null;
+
 function showModal(title, body, opts = {}) {
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay.classList.contains('hidden')) lastFocus = document.activeElement;
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').textContent  = body;
 
@@ -465,13 +569,17 @@ function showModal(title, body, opts = {}) {
 
   closeBtn.textContent = opts.closeText || '關閉';
   closeBtn.style.display = opts.hideClose ? 'none' : '';
-  document.getElementById('modal-overlay').classList.remove('hidden');
+  overlay.classList.remove('hidden');
+  if (!opts.input) setTimeout(() => (opts.onConfirm ? confirmBtn : closeBtn).focus(), 30);
 }
 
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
   document.getElementById('modal-input').classList.add('hidden');
   document.getElementById('modal-confirm').classList.add('hidden');
+  const back = lastFocus;
+  lastFocus = null;
+  if (back && typeof back.focus === 'function' && document.contains(back)) back.focus();
 }
 
 // ── Player modal ──────────────────────────────────────────────────────────────
@@ -499,12 +607,123 @@ function showPlayerModal(required = false) {
       Object.keys(CROPS).forEach(k=>{state.inventory[k]=0;});
       state.plots.forEach(p=>{ p.fertCount=0; p.overWatered=false; p.deathCause=null; });
       loadState();
-      document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool==='plant'));
       selectTool(state.selectedTool || 'plant');
       render();
       addLog(`🌾 歡迎，${name}！繼續你的農場之旅！`);
+      maybeShowTutorial();
     },
   });
+}
+
+// ── First-visit tutorial ──────────────────────────────────────────────────────
+const TUTORIAL_STEPS = [
+  {
+    title: '歡迎來到開心農場',
+    body: '左邊是工具、倉庫和前十名，中間是農地，右邊是種子商店和日誌。先選一種種子（一開始有蘿蔔和番茄），再點「種植」，然後點空地。',
+  },
+  {
+    title: '澆水與收穫',
+    body: '作物渴了會枯萎，用「澆水」照顧它。成熟後改選「收穫」，作物會進倉庫。不要在很短的時間裡連續澆水，水太多也會讓植物受傷。',
+  },
+  {
+    title: '賣出、升級、施肥',
+    body: '按「賣出全部」換成金幣。經驗累積到 800 會升上等級 2，並解鎖更多農地。施肥能加快生長，但同一株最多兩次。',
+  },
+  {
+    title: '天氣、聲音與休息',
+    body: '上方會顯示晴天、多雲、下雨、乾旱或暴風雨。下雨會幫忙澆水，乾旱要更勤快，暴風雨可能讓作物受損。背景音樂預設關閉，教室裡不會突然出聲；需要時再按「音樂」。玩滿 20 分鐘，計時器會提醒休息。',
+  },
+];
+
+let tutorialIndex = 0;
+
+function tutorialStorageKey() { return 'happyFarm_tutorialSeen_' + getPlayerName(); }
+function hasSeenTutorial() { return !!getPlayerName() && localStorage.getItem(tutorialStorageKey()) === '1'; }
+function markTutorialSeen() { if (getPlayerName()) localStorage.setItem(tutorialStorageKey(), '1'); }
+
+function renderTutorial() {
+  const step = TUTORIAL_STEPS[tutorialIndex];
+  document.getElementById('tutorial-title').textContent = step.title;
+  document.getElementById('tutorial-body').textContent = step.body;
+  document.getElementById('tutorial-count').textContent = `第 ${tutorialIndex + 1} 步，共 ${TUTORIAL_STEPS.length} 步`;
+  const prev = document.getElementById('tutorial-prev');
+  const next = document.getElementById('tutorial-next');
+  prev.disabled = tutorialIndex === 0;
+  next.textContent = tutorialIndex === TUTORIAL_STEPS.length - 1 ? '開始玩' : '下一步';
+  const dots = document.getElementById('tutorial-dots');
+  dots.innerHTML = '';
+  TUTORIAL_STEPS.forEach((_, i) => {
+    const dot = document.createElement('span');
+    dot.className = 'tutorial-dot' + (i === tutorialIndex ? ' on' : '');
+    dots.appendChild(dot);
+  });
+}
+
+function openTutorial() {
+  tutorialIndex = 0;
+  document.getElementById('tutorial-overlay').classList.remove('hidden');
+  renderTutorial();
+  document.getElementById('tutorial-next').focus();
+}
+
+function closeTutorial() {
+  markTutorialSeen();
+  document.getElementById('tutorial-overlay').classList.add('hidden');
+}
+
+function maybeShowTutorial() {
+  if (!getPlayerName() || hasSeenTutorial()) return;
+  if (!document.getElementById('modal-overlay').classList.contains('hidden')) return;
+  openTutorial();
+}
+
+function syncAudioButtons() {
+  const bg = document.getElementById('bg-toggle');
+  const sfx = document.getElementById('sfx-toggle');
+  if (!bg || !sfx || typeof AudioManager === 'undefined') return;
+  const bgOn = AudioManager.isBgOn();
+  const sfxOn = AudioManager.isSfxOn();
+  bg.querySelector('.btn-label').textContent = bgOn ? '音樂開' : '音樂關';
+  bg.classList.toggle('is-on', bgOn);
+  bg.classList.toggle('muted', !bgOn);
+  bg.setAttribute('aria-pressed', String(bgOn));
+  bg.setAttribute('aria-label', bgOn ? '關閉背景音樂' : '開啟背景音樂');
+  sfx.querySelector('.btn-label').textContent = sfxOn ? '音效開' : '音效關';
+  sfx.classList.toggle('is-on', sfxOn);
+  sfx.classList.toggle('muted', !sfxOn);
+  sfx.setAttribute('aria-pressed', String(sfxOn));
+  sfx.setAttribute('aria-label', sfxOn ? '關閉音效' : '開啟音效');
+}
+
+function syncFullscreenBtn() {
+  const fsBtn = document.getElementById('fullscreen-btn');
+  if (!fsBtn) return;
+  const on = !!document.fullscreenElement;
+  fsBtn.textContent = on ? '⊠' : '⛶';
+  fsBtn.setAttribute('aria-pressed', String(on));
+  fsBtn.setAttribute('aria-label', on ? '退出全螢幕' : '進入全螢幕');
+  fsBtn.title = on ? '退出全螢幕' : '全螢幕';
+}
+
+function focusableIn(container) {
+  return [...container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter(el => !el.disabled && !el.classList.contains('hidden') && el.offsetParent !== null);
+}
+
+function trapFocus(container, event) {
+  if (event.key !== 'Tab') return;
+  const dialog = container.querySelector('[role="dialog"]') || container;
+  const nodes = focusableIn(dialog);
+  if (!nodes.length) return;
+  const first = nodes[0];
+  const last = nodes[nodes.length - 1];
+  if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -527,14 +746,53 @@ function init() {
   document.querySelectorAll('.tool-btn').forEach(btn=>btn.addEventListener('click',()=>selectTool(btn.dataset.tool)));
   document.getElementById('sell-all-btn').addEventListener('click', sellAll);
   document.getElementById('modal-close').addEventListener('click', closeModal);
-  document.getElementById('modal-overlay').addEventListener('click', e=>{ if(e.target===document.getElementById('modal-overlay')) closeModal(); });
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target !== e.currentTarget) return;
+    const closeBtn = document.getElementById('modal-close');
+    if (closeBtn && closeBtn.style.display === 'none') return;
+    closeModal();
+  });
 
   document.getElementById('player-btn').addEventListener('click', () => showPlayerModal(false));
   document.getElementById('pause-btn').addEventListener('click', togglePause);
+  document.getElementById('help-btn').addEventListener('click', openTutorial);
+  document.getElementById('tutorial-skip').addEventListener('click', closeTutorial);
+  document.getElementById('tutorial-prev').addEventListener('click', () => {
+    if (tutorialIndex === 0) return;
+    tutorialIndex -= 1;
+    renderTutorial();
+  });
+  document.getElementById('tutorial-next').addEventListener('click', () => {
+    if (tutorialIndex >= TUTORIAL_STEPS.length - 1) { closeTutorial(); return; }
+    tutorialIndex += 1;
+    renderTutorial();
+    document.getElementById('tutorial-next').focus();
+  });
+  document.getElementById('tutorial-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeTutorial();
+  });
+  document.addEventListener('keydown', (e) => {
+    const tut = document.getElementById('tutorial-overlay');
+    if (tut && !tut.classList.contains('hidden')) {
+      trapFocus(tut, e);
+      if (e.key === 'Escape') { e.preventDefault(); closeTutorial(); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); document.getElementById('tutorial-next').click(); }
+      if (e.key === 'ArrowLeft' && tutorialIndex > 0) { e.preventDefault(); tutorialIndex -= 1; renderTutorial(); }
+      return;
+    }
+    const modal = document.getElementById('modal-overlay');
+    if (modal && !modal.classList.contains('hidden')) {
+      trapFocus(modal, e);
+      if (e.key === 'Escape') {
+        const closeBtn = document.getElementById('modal-close');
+        if (closeBtn && closeBtn.style.display !== 'none') closeModal();
+      }
+    }
+  });
 
   document.getElementById('restart-btn').addEventListener('click', () => {
-    showModal('🔄 重新開始', `確定要清除 ${getPlayerName()} 的所有進度重新開始嗎？`, {
-      confirmText: '確定重置',
+    showModal('🔄 重玩', `確定要清除 ${getPlayerName()} 的所有進度，重新開始嗎？`, {
+      confirmText: '確定重玩',
       closeText: '取消',
       onConfirm: () => resetGame(),
     });
@@ -546,24 +804,22 @@ function init() {
       if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
       else document.exitFullscreen?.();
     });
-    document.addEventListener('fullscreenchange', () => {
-      fsBtn.textContent = document.fullscreenElement ? '⊠' : '⛶';
-    });
+    document.addEventListener('fullscreenchange', syncFullscreenBtn);
   }
 
-  // Audio: start context on first interaction (browser autoplay policy)
-  document.body.addEventListener('click', ()=>AudioManager.start(), {once:true});
-  document.getElementById('bg-toggle').addEventListener('click', ()=>{
-    const on=AudioManager.toggleBg();
-    document.getElementById('bg-toggle').textContent=on?'🎵':'🔇';
-    document.getElementById('bg-toggle').classList.toggle('muted',!on);
+  // Music stays off until chosen. The first gesture only resumes a saved "on".
+  document.body.addEventListener('pointerdown', () => AudioManager.start(), { once: true });
+  document.getElementById('bg-toggle').addEventListener('click', () => {
+    AudioManager.toggleBg();
+    syncAudioButtons();
   });
-  document.getElementById('sfx-toggle').addEventListener('click', ()=>{
-    const on=AudioManager.toggleSfx();
-    document.getElementById('sfx-toggle').textContent=on?'🔊':'🔕';
-    document.getElementById('sfx-toggle').classList.toggle('muted',!on);
+  document.getElementById('sfx-toggle').addEventListener('click', () => {
+    AudioManager.toggleSfx();
+    syncAudioButtons();
   });
 
+  selectTool(state.selectedTool || 'plant');
+  syncAudioButtons();
   render();
   setInterval(growTick, 1000);
   setInterval(saveState, 10000);
@@ -572,6 +828,7 @@ function init() {
     showPlayerModal(true);   // 第一次進入：強制輸入名稱
   } else {
     addLog(`🌾 歡迎回來，${getPlayerName()}！繼續你的農場之旅！`);
+    maybeShowTutorial();
   }
 }
 
