@@ -2,8 +2,30 @@
 
 const AudioManager = (() => {
   let ctx = null, masterGain, bgGain, sfxGain;
-  let bgOn = true, sfxOn = true;
+  // Classroom default: soundtrack stays off until a person turns it on.
+  let bgOn = false, sfxOn = true;
+  let userWantsBg = false;
+  let bgSuspended = false;
   let bgTimer = null;
+  const PREF_KEY = 'happyFarm_audioPrefs';
+
+  function loadPrefs() {
+    try {
+      const raw = localStorage.getItem(PREF_KEY);
+      if (!raw) return;
+      const prefs = JSON.parse(raw);
+      if (typeof prefs.bg === 'boolean') { userWantsBg = prefs.bg; bgOn = prefs.bg; }
+      if (typeof prefs.sfx === 'boolean') sfxOn = prefs.sfx;
+    } catch (e) { /* keep the silent-music default */ }
+  }
+
+  function savePrefs() {
+    try {
+      localStorage.setItem(PREF_KEY, JSON.stringify({ bg: userWantsBg, sfx: sfxOn }));
+    } catch (e) { /* private mode can block storage */ }
+  }
+
+  loadPrefs();
 
   const BPM = 128;
   const B = 60 / BPM;
@@ -34,7 +56,7 @@ const AudioManager = (() => {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     masterGain = ctx.createGain(); masterGain.gain.value = 1; masterGain.connect(ctx.destination);
-    bgGain = ctx.createGain(); bgGain.gain.value = bgOn ? 0.18 : 0; bgGain.connect(masterGain);
+    bgGain = ctx.createGain(); bgGain.gain.value = 0; bgGain.connect(masterGain);
     sfxGain = ctx.createGain(); sfxGain.gain.value = sfxOn ? 0.55 : 0; sfxGain.connect(masterGain);
   }
 
@@ -82,29 +104,56 @@ const AudioManager = (() => {
     bgTimer = setTimeout(() => loop(t0 + LOOP_DUR), (LOOP_DUR - 0.3) * 1000);
   }
 
-  function startBg() {
+  function stopBg() {
     clearTimeout(bgTimer);
-    if (bgOn && ctx) loop(ctx.currentTime + 0.15);
+    bgTimer = null;
   }
 
-  function start() { init(); startBg(); }
+  function startBg() {
+    if (!(bgOn && ctx) || bgTimer) return;
+    loop(ctx.currentTime + 0.15);
+  }
+
+  function applyBg() {
+    bgOn = userWantsBg && !bgSuspended;
+    if (!ctx) return;
+    if (bgOn) {
+      bgGain.gain.setTargetAtTime(0.18, ctx.currentTime, 0.45);
+      startBg();
+    } else {
+      bgGain.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
+      stopBg();
+    }
+  }
+
+  // Unlock / resume. Music plays only when the saved choice is on, and fades in.
+  function start() { init(); applyBg(); }
 
   function toggleBg() {
-    bgOn = !bgOn;
-    if (ctx) bgGain.gain.setTargetAtTime(bgOn ? 0.18 : 0, ctx.currentTime, 0.3);
-    if (bgOn) { init(); startBg(); } else clearTimeout(bgTimer);
-    return bgOn;
+    userWantsBg = !userWantsBg;
+    if (userWantsBg) init();
+    applyBg();
+    savePrefs();
+    return userWantsBg;
   }
 
   function toggleSfx() {
     sfxOn = !sfxOn;
     if (ctx) sfxGain.gain.setTargetAtTime(sfxOn ? 0.55 : 0, ctx.currentTime, 0.1);
+    savePrefs();
     return sfxOn;
   }
 
+  // Pause silences the soundtrack without flipping the saved preference.
+  function setBgSuspended(suspended) {
+    bgSuspended = !!suspended;
+    if (!suspended && userWantsBg) init();
+    applyBg();
+  }
+
   return {
-    start, toggleBg, toggleSfx,
-    isBgOn: () => bgOn, isSfxOn: () => sfxOn,
+    start, toggleBg, toggleSfx, setBgSuspended,
+    isBgOn: () => userWantsBg, isSfxOn: () => sfxOn,
     sfxPlant, sfxHarvest, sfxWater, sfxFertilize,
     sfxSell, sfxLevelUp, sfxWilt, sfxDead, sfxRemove,
   };
