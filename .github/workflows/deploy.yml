@@ -1,0 +1,43 @@
+# 開心農場是純靜態網站。這個 workflow 把教材原樣發佈到 GitHub Pages。
+#
+# github-pages 環境目前只允許 main。在擁有者把
+# claude/design-happy-farm-game-LX5I7 加入該環境的 Deployment branches
+# 之前，deploy job 會在進入 runner 前被拒絕。
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - claude/design-happy-farm-game-LX5I7
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
